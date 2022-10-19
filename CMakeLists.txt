@@ -46,7 +46,7 @@ add_library(renderer_cpu)
 target_compile_features(renderer_cpu PUBLIC cxx_std_17)
 target_link_libraries(renderer_cpu PRIVATE spdlog::spdlog)
 target_link_libraries(renderer_cpu PRIVATE ${Boost_LIBRARIES})
-target_sources(renderer_cpu PRIVATE src/render_cpu.cpp src/render_cpu.h)
+target_sources(renderer_cpu PRIVATE src/render_cpu.cpp src/render_cpu.hpp)
 
 add_executable(main src/main.cpp)
 target_compile_features(main PUBLIC cxx_std_17)

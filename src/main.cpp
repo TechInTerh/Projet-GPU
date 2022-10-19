@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include "render_gpu.cuh"
-#include "render_cpu.h"
+#include "render_cpu.hpp"
 #include <boost/gil/image.hpp>
 #include <boost/gil/extension/io/png/read.hpp>
 #include <boost/gil/extension/io/png/write.hpp>

@@ -3,4 +3,5 @@
 
 void use_gpu();
 
+
 #endif //GPGPU_RENDER_GPU_CUH
