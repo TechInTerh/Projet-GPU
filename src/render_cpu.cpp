@@ -4,14 +4,15 @@
 #include <vector>
 #include <vector_types.h>
 
-uchar4 * list_uchar4(gil::rgb8_image_t &image)
+
+matrixImage * toMatrixImage(gil::rgb8_image_t &image)
 {
 	gil::rgb8_image_t::const_view_t view = gil::const_view(image);
 	assert(view.is_1d_traversable());
 
 	size_t width = view.width();
 	size_t height = view.height();
-	uchar4 *buf = new uchar4[width * height];
+	matrixImage* mat = new matrixImage(width,height);
 
 	for (size_t i = 0; i < height; i+=1)
 	{
@@ -20,19 +21,34 @@ uchar4 * list_uchar4(gil::rgb8_image_t &image)
 		{
 
 			gil::rgb8_pixel_t pixel = it[j];
-			buf[i*width+j].x = gil::at_c<0>(pixel);
-			buf[i*width+j].y = gil::at_c<1>(pixel);
-			buf[i*width+j].z = gil::at_c<2>(pixel);
-			buf[i*width+j].w = 0;
+			uchar4 a = uchar4();
+			a.x = gil::at_c<0>(pixel);
+			a.y = gil::at_c<1>(pixel);
+			a.z = gil::at_c<2>(pixel);
+			a.w = 0;
+			mat->set(i, j, a);
 		}
 
 		// use it[j] to access pixel[i][j]
 	}
-	return buf;
+	return mat;
 }
 
 void useCpu(boost::gil::rgb8_image_t &image)
 {
-	uchar4 * buffer = list_uchar4(image);
-	delete buffer;
+	matrixImage * matImg = toMatrixImage(image);
+
+	delete matImg;
+}
+
+void toGrayscale(matrixImage *buffer, size_t width, size_t height)
+{
+	for (size_t w = 0; w < width; w++)
+	{
+		for (size_t h = 0; h < height ; h++)
+		{
+			uchar4 *pixel = buffer->at(h,w);
+			
+		}
+	}
 }
