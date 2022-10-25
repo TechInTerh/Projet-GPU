@@ -19,18 +19,19 @@ void _abortError(const char *msg, const char *fname, int line)
 
 #define abortError(msg) _abortError(msg, __FUNCTION__, __LINE__)
 
+template <typename T>
 struct matrixImage
 {
-	uchar4* buffer;
+	T* buffer;
 	size_t width;
 	size_t height;
 
 	matrixImage(size_t width, size_t height) : width(width), height(height)
 	{
-		buffer = new uchar4[width*height];
+		buffer = new T[width*height];
 	}
 
-	uchar4* at(size_t x,size_t y) const
+	T* at(size_t x,size_t y) const
 	{
 		if (x>width || y > height)
 		{
@@ -38,13 +39,13 @@ struct matrixImage
 		}
 		return &buffer[y*width+x];
 	}
-	void set(size_t x, size_t y, uchar4 &value)
+	void set(size_t x, size_t y, T &value)
 	{
 		*this->at(x,y) = value;
 	}
 };
 void useCpu(gil::rgb8_image_t &image);
-matrixImage * toMatrixImage(gil::rgb8_image_t &image);
-void toGrayscale(matrixImage *buffer, size_t width, size_t height);
+matrixImage<uchar4> *toMatrixImage(gil::rgb8_image_t &image);
+void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out, size_t width, size_t height);
 
 #endif //GPGPU_RENDER_CPU_HPP
