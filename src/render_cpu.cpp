@@ -5,6 +5,12 @@
 #include <vector_types.h>
 
 
+void _abortError(const char *msg,const char *filename, const char *fname, int line)
+{
+	spdlog::error("{} ({},file: {}, line: {})", msg, filename,fname, line);
+	std::exit(1);
+}
+
 template <typename T>
 matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
 {
@@ -15,19 +21,19 @@ matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
 	size_t height = view.height();
 	matrixImage<T> *mat = new matrixImage<T>(width,height);
 
-	for (size_t i = 0; i < height; i+=1)
+	for (size_t y = 0; y < height; y+=1)
 	{
-		auto it = view.row_begin(i);
-		for (size_t j = 0; j < width ; j++)
+		auto it = view.row_begin(y);
+		for (size_t x = 0; x < width ; x++)
 		{
 
-			gil::rgb8_pixel_t pixel = it[j];
+			gil::rgb8_pixel_t pixel = it[x];
 			T a = T();
 			a.x = gil::at_c<0>(pixel);
 			a.y = gil::at_c<1>(pixel);
 			a.z = gil::at_c<2>(pixel);
 			a.w = 0;
-			mat->set(i, j, a);
+			mat->set(x, y, a);
 		}
 
 		// use it[j] to access pixel[i][j]
@@ -37,7 +43,7 @@ matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
 
 void useCpu(boost::gil::rgb8_image_t &image)
 {
-	matrixImage<uchar4> *matImg = toMatrixImage(image);
+	matrixImage<uchar4> *matImg = toMatrixImage<uchar4>(image);
 
 	delete matImg;
 }

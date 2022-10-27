@@ -10,42 +10,47 @@
 #include <spdlog/spdlog.h>
 
 namespace gil = boost::gil;
-[[gnu::noinline]]
-void _abortError(const char *msg, const char *fname, int line)
-{
-	spdlog::error("{} ({}, line: {})", msg, fname, line);
-	std::exit(1);
-}
 
-#define abortError(msg) _abortError(msg, __FUNCTION__, __LINE__)
 
-template <typename T>
+void _abortError(const char *msg, const char *filename, const char *fname, int line);
+
+#define abortError(msg) _abortError(msg,__FILE__, __FUNCTION__, __LINE__)
+
+template<typename T>
 struct matrixImage
 {
-	T* buffer;
+	T *buffer;
 	size_t width;
 	size_t height;
 
 	matrixImage(size_t width, size_t height) : width(width), height(height)
 	{
-		buffer = new T[width*height];
+		buffer = new T[width * height];
 	}
 
-	T* at(size_t x,size_t y) const
+	T *at(size_t x, size_t y) const
 	{
-		if (x>width || y > height)
+		if (x > width || y > height)
 		{
 			abortError("Access out of bound");
 		}
-		return &buffer[y*width+x];
+		return &buffer[y * width + x];
 	}
+
 	void set(size_t x, size_t y, T &value)
 	{
-		*this->at(x,y) = value;
+		*this->at(x, y) = value;
 	}
 };
+
+template<typename T>
+matrixImage<T> *toMatrixImage(gil::rgb8_image_t &image);
+
 void useCpu(gil::rgb8_image_t &image);
+
 matrixImage<uchar4> *toMatrixImage(gil::rgb8_image_t &image);
-void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out, size_t width, size_t height);
+
+void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out,
+				 size_t width, size_t height);
 
 #endif //GPGPU_RENDER_CPU_HPP
