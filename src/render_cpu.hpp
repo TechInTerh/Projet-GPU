@@ -16,6 +16,12 @@ void _abortError(const char *msg, const char *filename, const char *fname, int l
 
 #define abortError(msg) _abortError(msg,__FILE__, __FUNCTION__, __LINE__)
 
+struct kernel
+{
+	float **buf;
+	size_t size;
+};
+
 template<typename T>
 struct matrixImage
 {
@@ -43,6 +49,7 @@ struct matrixImage
 	}
 };
 
+
 template<typename T>
 matrixImage<T> *toMatrixImage(gil::rgb8_image_t &image);
 
@@ -50,7 +57,7 @@ void useCpu(gil::rgb8_image_t &image);
 
 matrixImage<uchar4> *toMatrixImage(gil::rgb8_image_t &image);
 
-void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out,
-				 size_t width, size_t height);
+void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out);
+void gaussianBlur(matrixImage<float> *buf_in, matrixImage<float> *buf_out);
 
 #endif //GPGPU_RENDER_CPU_HPP
