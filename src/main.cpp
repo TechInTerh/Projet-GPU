@@ -21,11 +21,11 @@ gil::rgb8_image_t loadImage(const std::string &path)
 
 }
 
-int main()
+int main(int argc, const char *argv[])
 {
-
-	gil::rgb8_image_t image = loadImage("img/img_1.png");
-	writeImage("img/test.png", image);
+	//FIXME add option handling here
+	gil::rgb8_image_t image = loadImage("../img/img_1.png");
+	writeImage("../img/test.png", image);
 #if (USE_GPU)
 	spdlog::info("Using GPU");
 	use_gpu();
