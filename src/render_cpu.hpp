@@ -43,14 +43,11 @@ struct matrixImage
 	}
 };
 
-template<typename T>
-matrixImage<T> *toMatrixImage(gil::rgb8_image_t &image);
-
 void useCpu(gil::rgb8_image_t &image);
 
-matrixImage<uchar4> *toMatrixImage(gil::rgb8_image_t &image);
+matrixImage<uchar3> * toMatrixImage(gil::rgb8_image_t &image);
 
-void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out,
+void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out,
 				 size_t width, size_t height);
 
 #endif //GPGPU_RENDER_CPU_HPP

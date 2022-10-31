@@ -10,30 +10,30 @@
 #include <boost/gil/extension/io/png/write.hpp>
 #include <boost/gil/extension/io/png.hpp>
 
-void _abortError(const char *msg,const char *filename, const char *fname, int line)
+void
+_abortError(const char *msg, const char *filename, const char *fname, int line)
 {
-	spdlog::error("{} ({},file: {}, line: {})", msg, filename,fname, line);
+	spdlog::error("{} ({},file: {}, line: {})", msg, filename, fname, line);
 	std::exit(1);
 }
 
-template <typename T>
-matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
+matrixImage<uchar3> *toMatrixImage(gil::rgb8_image_t &image)
 {
 	gil::rgb8_image_t::const_view_t view = gil::const_view(image);
 	assert(view.is_1d_traversable());
 
 	size_t width = view.width();
 	size_t height = view.height();
-	matrixImage<T> *mat = new matrixImage<T>(width,height);
+	matrixImage<uchar3> *mat = new matrixImage<uchar3>(width, height);
 
-	for (size_t y = 0; y < height; y+=1)
+	for (size_t y = 0; y < height; y += 1)
 	{
 		auto it = view.row_begin(y);
-		for (size_t x = 0; x < width ; x++)
+		for (size_t x = 0; x < width; x++)
 		{
 
 			gil::rgb8_pixel_t pixel = it[x];
-			T a = T();
+			uchar3 a = uchar3();
 			a.x = gil::at_c<0>(pixel);
 			a.y = gil::at_c<1>(pixel);
 			a.z = gil::at_c<2>(pixel);
@@ -44,23 +44,27 @@ matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
 	}
 	return mat;
 }
+
 void write_image(matrixImage<uchar3> *matImage)
 {
-	gil::rgb8_pixel_t *pix = (gil::rgb8_pixel_t *)(matImage->buffer);
-	gil::rgb8c_view_t src = gil::interleaved_view(matImage->width, matImage->height, (boost::gil::rgb8_pixel_t const*)(matImage->buffer),matImage->width*
-																																		 sizeof(uchar3));
+	gil::rgb8c_view_t src = gil::interleaved_view(matImage->width,
+												  matImage->height,
+												  (boost::gil::rgb8_pixel_t const *) (matImage->buffer),
+												  matImage->width *
+												  sizeof(uchar3));
 	spdlog::info("Writing into my_file.png");
-	gil::write_view("my_file.png",src,gil::png_tag());
+	gil::write_view("my_file.png", src, gil::png_tag());
 }
 
-void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out, size_t width, size_t height)
+void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out,
+				 size_t width, size_t height)
 {
 	for (size_t w = 0; w < width; w++)
 	{
-		for (size_t h = 0; h < height ; h++)
+		for (size_t h = 0; h < height; h++)
 		{
-			uchar4 *px_in = buf_in->at(h,w);
-			float px_out = 0.3 * px_in->x + + 0.59 * px_in->y + 0.11 * px_in->z;
+			uchar3 *px_in = buf_in->at(h, w);
+			float px_out = 0.3 * px_in->x + +0.59 * px_in->y + 0.11 * px_in->z;
 			buf_out->set(h, w, px_out);
 		}
 	}
@@ -121,9 +125,10 @@ void gaussianBlur(
 		}
 	}
 }
+
 void useCpu(boost::gil::rgb8_image_t &image)
 {
-	matrixImage<uchar3> *matImg = toMatrixImage<uchar3>(image);
+	matrixImage<uchar3> *matImg = toMatrixImage(image);
 	write_image(matImg);
 	delete matImg;
 }
