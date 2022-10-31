@@ -3,7 +3,12 @@
 #include <cstddef>
 #include <vector>
 #include <vector_types.h>
-
+#include <boost/gil/image.hpp>
+#include <boost/gil/typedefs.hpp>
+#include <boost/gil/image.hpp>
+#include <boost/gil/extension/io/png/read.hpp>
+#include <boost/gil/extension/io/png/write.hpp>
+#include <boost/gil/extension/io/png.hpp>
 
 void _abortError(const char *msg,const char *filename, const char *fname, int line)
 {
@@ -32,7 +37,6 @@ matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
 			a.x = gil::at_c<0>(pixel);
 			a.y = gil::at_c<1>(pixel);
 			a.z = gil::at_c<2>(pixel);
-			a.w = 0;
 			mat->set(x, y, a);
 		}
 
@@ -40,13 +44,15 @@ matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
 	}
 	return mat;
 }
-
-void useCpu(boost::gil::rgb8_image_t &image)
+void write_image(matrixImage<uchar3> *matImage)
 {
-	matrixImage<uchar4> *matImg = toMatrixImage<uchar4>(image);
-
-	delete matImg;
+	gil::rgb8_pixel_t *pix = (gil::rgb8_pixel_t *)(matImage->buffer);
+	gil::rgb8c_view_t src = gil::interleaved_view(matImage->width, matImage->height, (boost::gil::rgb8_pixel_t const*)(matImage->buffer),matImage->width*
+																																		 sizeof(uchar3));
+	spdlog::info("Writing into my_file.png");
+	gil::write_view("my_file.png",src,gil::png_tag());
 }
+
 void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out, size_t width, size_t height)
 {
 	for (size_t w = 0; w < width; w++)
@@ -114,4 +120,10 @@ void gaussianBlur(
 			pxGaussianBlur(buf_in, buf_out, w, h, kernel, kernel_size, offset);
 		}
 	}
+}
+void useCpu(boost::gil::rgb8_image_t &image)
+{
+	matrixImage<uchar3> *matImg = toMatrixImage<uchar3>(image);
+	write_image(matImg);
+	delete matImg;
 }
