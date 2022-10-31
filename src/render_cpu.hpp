@@ -34,18 +34,18 @@ struct matrixImage
 		buffer = new T[width * height];
 	}
 
-	T *at(size_t x, size_t y) const
+	T *at(size_t w, size_t h) const
 	{
-		if (x > width || y > height)
+		if (w > width || h > height)
 		{
 			abortError("Access out of bound");
 		}
-		return &buffer[y * width + x];
+		return &buffer[h * width + w];
 	}
 
-	void set(size_t x, size_t y, T &value)
+	void set(size_t w, size_t h, T &value)
 	{
-		*this->at(x, y) = value;
+		*this->at(w, h) = value;
 	}
 };
 
