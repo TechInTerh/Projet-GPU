@@ -45,6 +45,24 @@ matrixImage<uchar3> *toMatrixImage(gil::rgb8_image_t &image)
 	return mat;
 }
 
+matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn)
+{
+	spdlog::info("Converting to uchar3");
+	matrixImage<uchar3> *matOut = new matrixImage<uchar3>(matIn->width,matIn->height);
+	for (size_t w = 0; w < matIn->width; w++)
+	{
+		for (size_t h = 0; h < matIn->height; h++)
+		{
+			uchar3 val = uchar3();
+			val.x = ceil(*matIn->at(w,h));
+			val.y = val.x;
+			val.z = val.x;
+			matOut->set(w,h, val);
+		}
+	}
+	return matOut;
+}
+
 void write_image(matrixImage<uchar3> *matImage)
 {
 	gil::rgb8c_view_t src = gil::interleaved_view(matImage->width,
@@ -59,13 +77,14 @@ void write_image(matrixImage<uchar3> *matImage)
 void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out,
 				 size_t width, size_t height)
 {
+	spdlog::info("To Grayscale");
 	for (size_t w = 0; w < width; w++)
 	{
 		for (size_t h = 0; h < height; h++)
 		{
-			uchar3 *px_in = buf_in->at(h, w);
+			uchar3 *px_in = buf_in->at(w, h);
 			float px_out = 0.3 * px_in->x + +0.59 * px_in->y + 0.11 * px_in->z;
-			buf_out->set(h, w, px_out);
+			buf_out->set(w, h, px_out);
 		}
 	}
 }
@@ -129,6 +148,11 @@ void gaussianBlur(
 void useCpu(boost::gil::rgb8_image_t &image)
 {
 	matrixImage<uchar3> *matImg = toMatrixImage(image);
-	write_image(matImg);
+	matrixImage<float> *matGray = new matrixImage<float>(matImg->width,matImg->height);
+	toGrayscale(matImg,matGray,matImg->width,matImg->height);
+	matrixImage<uchar3> *matGray2 = matFloatToMatUchar3(matGray);
+	write_image(matGray2);
+	delete matGray;
+	delete matGray2;
 	delete matImg;
 }
