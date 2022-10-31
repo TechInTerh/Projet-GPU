@@ -3,73 +3,55 @@
 #include <cstddef>
 #include <vector>
 #include <vector_types.h>
+#include <boost/gil/image.hpp>
+#include <boost/gil/typedefs.hpp>
+#include <boost/gil/image.hpp>
+#include <boost/gil/extension/io/png/read.hpp>
+#include <boost/gil/extension/io/png/write.hpp>
+#include <boost/gil/extension/io/png.hpp>
 
-void _abortError(const char *msg,const char *filename, const char *fname, int line)
+void
+_abortError(const char *msg, const char *filename, const char *fname, int line)
 {
-	spdlog::error("{} ({},file: {}, line: {})", msg, filename,fname, line);
+	spdlog::error("{} ({},file: {}, line: {})", msg, filename, fname, line);
 	std::exit(1);
 }
 
-template <typename T>
-matrixImage<T> * toMatrixImage(gil::rgb8_image_t &image)
+
+matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn)
 {
-	std::cout << "in toMatrixImage.\n";
-	gil::rgb8_image_t::const_view_t view = gil::const_view(image);
-	assert(view.is_1d_traversable());
-
-	size_t width = view.width();
-	size_t height = view.height();
-	matrixImage<T> *mat = new matrixImage<T>(width,height);
-
-	for (size_t y = 0; y < height; y+=1)
+	spdlog::info("Converting to uchar3");
+	matrixImage<uchar3> *matOut = new matrixImage<uchar3>(matIn->width,matIn->height);
+	for (size_t w = 0; w < matIn->width; w++)
 	{
-		auto it = view.row_begin(y);
-		for (size_t x = 0; x < width ; x++)
+		for (size_t h = 0; h < matIn->height; h++)
 		{
-
-			gil::rgb8_pixel_t pixel = it[x];
-			T a = T();
-			a.x = gil::at_c<0>(pixel);
-			a.y = gil::at_c<1>(pixel);
-			a.z = gil::at_c<2>(pixel);
-			a.w = 0;
-			mat->set(x, y, a);
+			uchar3 val = uchar3();
+			val.x = ceil(*matIn->at(w,h));
+			val.y = val.x;
+			val.z = val.x;
+			matOut->set(w,h, val);
 		}
-
-		// use it[j] to access pixel[i][j]
 	}
-	return mat;
+	return matOut;
 }
-
-void useCpu(boost::gil::rgb8_image_t &image)
+void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out)
 {
-	matrixImage<uchar4> *matImg = toMatrixImage<uchar4>(image);
-
-	matrixImage<float> *grayImg = new matrixImage<float>(matImg->width, matImg->height);
-	toGrayscale(matImg, grayImg);
-
-	matrixImage<float> *gaussBlurImg = new matrixImage<float>(matImg->width, matImg->height);
-	gaussianBlur(grayImg, gaussBlurImg);
-
-	delete matImg;
-	delete grayImg;
-	delete gaussBlurImg;
-}
-void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out)
-{
+	spdlog::info("To Grayscale");
 	size_t width = buf_in->width;
 	size_t height = buf_in->height;
 	// FIXME add assert in case buf_in size != buf_out size
 	for (size_t w = 0; w < width; w++)
 	{
-		for (size_t h = 0; h < height ; h++)
+		for (size_t h = 0; h < height; h++)
 		{
-			uchar4 *px_in = buf_in->at(w,h);
-			float px_out = 0.3 * px_in->x + + 0.59 * px_in->y + 0.11 * px_in->z;
+			uchar3 *px_in = buf_in->at(w, h);
+			float px_out = 0.3 * px_in->x + 0.59 * px_in->y + 0.11 * px_in->z;
 			buf_out->set(w, h, px_out);
 		}
 	}
 }
+
 
 //  FIXME
 //  1. check if operators * and / are defined for uchar4 type and
@@ -127,4 +109,35 @@ void gaussianBlur(
 			pxGaussianBlur(buf_in, buf_out, w, h, offset);
 		}
 	}
+}
+
+void useCpu(boost::gil::rgb8_image_t &image)
+{
+	matrixImage<uchar3> *matImg = toMatrixImage(image);
+	matrixImage<float> *matGray = new matrixImage<float>(matImg->width,matImg->height);
+	toGrayscale(matImg, matGray);
+
+	matrixImage<float> *matGBlur = new matrixImage<float>(matImg->width,matImg->height);
+	gaussianBlur(matGray, matGBlur);
+	
+	matrixImage<float> *matGigaBlur_in = new matrixImage<float>(matImg->width,matImg->height);
+	matrixImage<float> *matGigaBlur_out = new matrixImage<float>(matImg->width,matImg->height);
+	matGigaBlur_in->copy(matGBlur);
+	int repeatBlur = 5;
+	for (int i = 0; i < repeatBlur; i++)
+	{
+		gaussianBlur(matGigaBlur_in, matGigaBlur_out);
+		matGigaBlur_in->copy(matGigaBlur_out);
+	}
+	matrixImage<uchar3> *matGray2 = matFloatToMatUchar3(matGray);
+	write_image(matGray2, "grayscale.png");
+	matrixImage<uchar3> *matGBlur2 = matFloatToMatUchar3(matGBlur);
+	write_image(matGBlur2, "gaussian_blur.png");
+	matrixImage<uchar3> *matGigaBlur2 = matFloatToMatUchar3(matGigaBlur_out);
+	write_image(matGigaBlur2, "giga_blur.png");
+	delete matGray;
+	delete matGray2;
+	delete matImg;
+	delete matGigaBlur_in;
+	delete matGigaBlur_out;
 }
