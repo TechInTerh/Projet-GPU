@@ -34,11 +34,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 
-add_library(renderer_gpu)
+add_library(renderer_gpu src/matrix_image/matrix_image.cpp src/matrix_image/matrix_image.h)
 target_compile_features(renderer_gpu PUBLIC cxx_std_17)
 target_link_libraries(renderer_gpu PRIVATE spdlog::spdlog)
 target_link_libraries(renderer_gpu PRIVATE ${Boost_LIBRARIES})
-target_sources(renderer_gpu PRIVATE src/render_gpu.cu src/render_gpu.cuh)
+target_sources(renderer_gpu PRIVATE
+        src/render_gpu.cu src/render_gpu.cuh
+        src/matrix_image/matrix_image.cpp
+        )
 set_target_properties(renderer_gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 
@@ -46,7 +49,10 @@ add_library(renderer_cpu)
 target_compile_features(renderer_cpu PUBLIC cxx_std_17)
 target_link_libraries(renderer_cpu PRIVATE spdlog::spdlog)
 target_link_libraries(renderer_cpu PRIVATE ${Boost_LIBRARIES})
-target_sources(renderer_cpu PRIVATE src/render_cpu.cpp src/render_cpu.hpp)
+target_sources(renderer_cpu PRIVATE
+        src/render_cpu.cpp src/render_cpu.hpp
+        src/matrix_image/matrix_image.cpp
+        )
 
 add_executable(main src/main.cpp)
 target_compile_features(main PUBLIC cxx_std_17)
