@@ -140,4 +140,5 @@ void useCpu(boost::gil::rgb8_image_t &image)
 	delete matImg;
 	delete matGigaBlur_in;
 	delete matGigaBlur_out;
+
 }
