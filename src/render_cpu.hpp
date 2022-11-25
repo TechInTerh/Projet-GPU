@@ -12,11 +12,10 @@
 
 
 
-
 void useCpu(gil::rgb8_image_t &image);
 
 
-void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out,
-				 size_t width, size_t height);
+void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out);
+void gaussianBlur(matrixImage<float> *buf_in, matrixImage<float> *buf_out);
 
 #endif //GPGPU_RENDER_CPU_HPP

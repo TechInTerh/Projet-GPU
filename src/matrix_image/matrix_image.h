@@ -42,10 +42,18 @@ struct matrixImage
 	{
 		*this->at(w, h) = value;
 	}
+
+	void copy(matrixImage<T> *mat_in)
+	{
+		width = mat_in->width;
+		height = mat_in->height;
+		buffer = new T[width * height];
+		memcpy(buffer, mat_in->buffer, sizeof(*buffer));
+	}
 };
 
 matrixImage<uchar3> *toMatrixImage(gil::rgb8_image_t &image);
 
-void write_image(matrixImage<uchar3> *matImage);
+void write_image(matrixImage<uchar3> *matImage, const char *filename);
 
 #endif //GPGPU_MATRIX_IMAGE_H
