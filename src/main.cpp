@@ -2,15 +2,9 @@
 #include "render_gpu.cuh"
 #include "render_cpu.hpp"
 #include <spdlog/spdlog.h>
-#define USE_GPU true
+#define USE_GPU false
 namespace gil = boost::gil;
 
-//using namespace boost::gil;
-void writeImage(const std::string &path, gil::rgb8_image_t &image)
-{
-	spdlog::info("Writing " + path);
-	write_view(path, gil::view(image), gil::png_tag());
-}
 
 gil::rgb8_image_t loadImage(const std::string &path)
 {
@@ -25,7 +19,6 @@ int main(int argc, const char *argv[])
 {
 	//FIXME add option handling here
 	gil::rgb8_image_t image = loadImage("../img/img_1.png");
-	writeImage("../img/test.png", image);
 #if (USE_GPU)
 	spdlog::info("Using GPU");
 	use_gpu();

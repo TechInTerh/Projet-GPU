@@ -1,14 +1,14 @@
 #include "matrix_image.h"
 
-void write_image(matrixImage<uchar3> *matImage)
+void write_image(matrixImage<uchar3> *matImage, const char *filename)
 {
 	gil::rgb8c_view_t src = gil::interleaved_view(matImage->width,
 												  matImage->height,
 												  (boost::gil::rgb8_pixel_t const *) (matImage->buffer),
 												  matImage->width *
 												  sizeof(uchar3));
-	spdlog::info("Writing into my_file.png");
-	gil::write_view("my_file.png", src, gil::png_tag());
+	spdlog::info("Writing into {}", filename);
+	gil::write_view(filename, src, gil::png_tag());
 }
 
 matrixImage<uchar3> *toMatrixImage(gil::rgb8_image_t &image)
