@@ -11,6 +11,7 @@
 #include "matrix_image/matrix_image.h"
 
 
+#define ERROR_MARGIN 0.1f
 
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2);
 

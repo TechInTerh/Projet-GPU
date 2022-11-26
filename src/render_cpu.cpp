@@ -10,7 +10,7 @@
 #include <boost/gil/extension/io/png/write.hpp>
 #include <boost/gil/extension/io/png.hpp>
 
-void
+	void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
 {
 	spdlog::error("{} ({},file: {}, line: {})", msg, filename, fname, line);
@@ -111,12 +111,83 @@ void gaussianBlur(
 	}
 }
 
+
+void px_dilation(matrixImage<float> *matImg, size_t se_w, size_t se_h, size_t w, size_t h)
+{
+	//FIXME maybe change the way the structuring element is used. Use square
+	// centered around current pixel instead of the current pixel being in a corner.
+	float *anchor_px = matImg->at(w, h);
+	if (*anchor_px < ERROR_MARGIN)
+	{
+		*anchor_px = 0.f;
+		return;
+	}
+	for (size_t sw = 0; sw + w < matImg->width && sw < se_w; sw++)
+	{
+		for (size_t sh = 0; sh + h < matImg->height && sh < se_h; sh++)
+		{
+			matImg->set(w + sw, h + sh, *anchor_px);
+		}
+	}
+}
+void dilation(matrixImage<float> *matImg, size_t se_w, size_t se_h)
+{
+	for (size_t w = 0; w < matImg->width; w++)
+	{
+		for (size_t h = 0; h < matImg->height; h++)
+		{
+			px_dilation(matImg, se_w, se_h, w, h);
+		}
+	}
+}
+
+void px_erosion(matrixImage<float> *matImg, size_t se_w, size_t se_h, size_t w, size_t h)
+{
+	//FIXME maybe change the way the structuring element is used. Use square
+	// centered around current pixel instead of the current pixel being in a corner.
+	float *anchor_px = matImg->at(w, h);
+	if (*anchor_px < ERROR_MARGIN)
+	{
+		*anchor_px = 0.f;
+		return;
+	}
+	for (size_t sw = 0; sw + w < matImg->width && sw < se_w; sw++)
+	{
+		for (size_t sh = 0; sh + h < matImg->height && sh < se_h; sh++)
+		{
+			float *cur_px = matImg->at(sw + w, sh + h);
+			if (*cur_px > ERROR_MARGIN)
+				*cur_px = 0.f;
+		}
+	}
+}
+void erosion(matrixImage<float> *matImg, size_t se_w, size_t se_h)
+{
+	for (size_t w = 0; w < matImg->width; w++)
+	{
+		for (size_t h = 0; h < matImg->height; h++)
+		{
+			px_erosion(matImg, se_w, se_h, w, h);
+		}
+	}
+}
+void opening(matrixImage<float> *matImg, size_t se_w, size_t se_h)
+{
+	erosion(matImg, se_w, se_h);
+	dilation(matImg, se_w, se_h);
+}
+void closing(matrixImage<float> *matImg, size_t se_w, size_t se_h)
+{
+	dilation(matImg, se_w, se_h);
+	erosion(matImg, se_w, se_h);
+}
+
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
 	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
 	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,matImg1->height);
 	toGrayscale(matImg1, matGray1);
-	
+
 	matrixImage<uchar3> *matImg2 = toMatrixImage(image2);
 	matrixImage<float> *matGray2 = new matrixImage<float>(matImg2->width,matImg2->height);
 	toGrayscale(matImg2, matGray2);
@@ -141,6 +212,7 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	matGBlur1_save->copy(matGBlur1);
 
 	matGBlur1->abs_diff(matGBlur2);
+	closing(matGBlur1, 2, 2);
 
 	matrixImage<uchar3> *matGray_out = matFloatToMatUchar3(matGray1);
 	write_image(matGray_out, "grayscale.png");
