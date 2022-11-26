@@ -3,6 +3,8 @@
 #include "render_cpu.hpp"
 #include <spdlog/spdlog.h>
 #define USE_GPU true
+#include <boost/version.hpp>
+
 namespace gil = boost::gil;
 
 //using namespace boost::gil;
@@ -23,12 +25,13 @@ gil::rgb8_image_t loadImage(const std::string &path)
 
 int main()
 {
+	std::cout << BOOST_LIB_VERSION << '\n';
 
 	gil::rgb8_image_t image = loadImage("img/img_1.png");
 	writeImage("img/test.png", image);
 #if (USE_GPU)
 	spdlog::info("Using GPU");
-	use_gpu();
+	use_gpu(image);
 #else
 	spdlog::info("Using CPU");
 	useCpu(image);

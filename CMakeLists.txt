@@ -34,13 +34,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 
-add_library(renderer_gpu src/matrix_image/matrix_image.cpp src/matrix_image/matrix_image.h)
+add_library(renderer_gpu src/matrix_image/matrix_image.cu src/matrix_image/matrix_image.cuh)
 target_compile_features(renderer_gpu PUBLIC cxx_std_17)
 target_link_libraries(renderer_gpu PRIVATE spdlog::spdlog)
 target_link_libraries(renderer_gpu PRIVATE ${Boost_LIBRARIES})
 target_sources(renderer_gpu PRIVATE
         src/render_gpu.cu src/render_gpu.cuh
-        src/matrix_image/matrix_image.cpp
+        src/matrix_image/matrix_image.cu
+        src/cudaFunctions/cudaFunctions.cu
+        src/env.cu
         )
 set_target_properties(renderer_gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
@@ -51,14 +53,11 @@ target_link_libraries(renderer_cpu PRIVATE spdlog::spdlog)
 target_link_libraries(renderer_cpu PRIVATE ${Boost_LIBRARIES})
 target_sources(renderer_cpu PRIVATE
         src/render_cpu.cpp src/render_cpu.hpp
-        src/matrix_image/matrix_image.cpp
+        src/matrix_image/matrix_image.cu
+        src/env.cu
         )
 
 add_executable(main src/main.cpp)
 target_compile_features(main PUBLIC cxx_std_17)
 target_link_libraries(main PRIVATE renderer_gpu PNG::PNG CLI11::CLI11 spdlog::spdlog renderer_cpu ${Boost_LIBRARIES})
-
-
-
-
 

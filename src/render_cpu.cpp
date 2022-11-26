@@ -10,12 +10,6 @@
 #include <boost/gil/extension/io/png/write.hpp>
 #include <boost/gil/extension/io/png.hpp>
 
-void
-_abortError(const char *msg, const char *filename, const char *fname, int line)
-{
-	spdlog::error("{} ({},file: {}, line: {})", msg, filename, fname, line);
-	std::exit(1);
-}
 
 
 matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn)
