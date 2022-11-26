@@ -50,6 +50,23 @@ struct matrixImage
 		buffer = new T[width * height];
 		memcpy(buffer, mat_in->buffer, sizeof(*buffer));
 	}
+
+	void abs_diff(matrixImage<T> *mat_diff)
+	{
+		if (mat_diff->height != height || mat_diff->width != width)
+		{
+			spdlog::error("substraction can only be used with matrices of same size.");
+			return;
+		}
+		for (size_t w = 0; w < width; w++)
+		{
+			for (size_t h = 0; h < height; h++)
+			{
+				T diff = std::abs(this->at(w,h) - mat_diff->at(w, h));
+				this->set(w, h, diff);
+			}
+		}
+	}
 };
 
 matrixImage<uchar3> *toMatrixImage(gil::rgb8_image_t &image);

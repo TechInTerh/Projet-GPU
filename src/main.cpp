@@ -2,7 +2,7 @@
 #include "render_gpu.cuh"
 #include "render_cpu.hpp"
 #include <spdlog/spdlog.h>
-#define USE_GPU true
+#define USE_GPU false
 namespace gil = boost::gil;
 
 
@@ -17,14 +17,17 @@ gil::rgb8_image_t loadImage(const std::string &path)
 
 int main(int argc, const char *argv[])
 {
+	if (argc < 3)
+		spdlog::info("ArgumentError: ./main <file1> <file2>");
 	//FIXME add option handling here
-	gil::rgb8_image_t image = loadImage("../img/img_1.png");
+	gil::rgb8_image_t image1 = loadImage(argv[1]);
+	gil::rgb8_image_t image2 = loadImage(argv[2]);
 #if (USE_GPU)
 	spdlog::info("Using GPU");
 	use_gpu();
 #else
 	spdlog::info("Using CPU");
-	useCpu(image);
+	useCpu(image1, image2);
 #endif
 	return 0;
 }
