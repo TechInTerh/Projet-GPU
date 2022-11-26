@@ -111,34 +111,54 @@ void gaussianBlur(
 	}
 }
 
-void useCpu(boost::gil::rgb8_image_t &image)
+void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
-	matrixImage<uchar3> *matImg = toMatrixImage(image);
-	matrixImage<float> *matGray = new matrixImage<float>(matImg->width,matImg->height);
-	toGrayscale(matImg, matGray);
-
-	matrixImage<float> *matGBlur = new matrixImage<float>(matImg->width,matImg->height);
-	gaussianBlur(matGray, matGBlur);
+	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
+	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,matImg1->height);
+	toGrayscale(matImg1, matGray1);
 	
-	matrixImage<float> *matGigaBlur_in = new matrixImage<float>(matImg->width,matImg->height);
-	matrixImage<float> *matGigaBlur_out = new matrixImage<float>(matImg->width,matImg->height);
-	matGigaBlur_in->copy(matGBlur);
+	matrixImage<uchar3> *matImg2 = toMatrixImage(image2);
+	matrixImage<float> *matGray2 = new matrixImage<float>(matImg2->width,matImg2->height);
+	toGrayscale(matImg2, matGray2);
+
+	matrixImage<float> *matGBlur1 = new matrixImage<float>(matImg1->width,matImg1->height);
+	gaussianBlur(matGray1, matGBlur1);
+
+	matrixImage<float> *matGBlur2 = new matrixImage<float>(matImg2->width,matImg2->height);
+	gaussianBlur(matGray2, matGBlur2);
+
+	matrixImage<float> *matGigaBlur_tmp = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matGigaBlur1 = new matrixImage<float>(matImg1->width,matImg1->height);
+	matGigaBlur_tmp->copy(matGBlur1);
 	int repeatBlur = 5;
 	for (int i = 0; i < repeatBlur; i++)
 	{
-		gaussianBlur(matGigaBlur_in, matGigaBlur_out);
-		matGigaBlur_in->copy(matGigaBlur_out);
+		gaussianBlur(matGigaBlur_tmp, matGigaBlur1);
+		matGigaBlur_tmp->copy(matGigaBlur1);
 	}
-	matrixImage<uchar3> *matGray2 = matFloatToMatUchar3(matGray);
-	write_image(matGray2, "grayscale.png");
-	matrixImage<uchar3> *matGBlur2 = matFloatToMatUchar3(matGBlur);
-	write_image(matGBlur2, "gaussian_blur.png");
-	matrixImage<uchar3> *matGigaBlur2 = matFloatToMatUchar3(matGigaBlur_out);
-	write_image(matGigaBlur2, "giga_blur.png");
-	delete matGray;
-	delete matGray2;
-	delete matImg;
-	delete matGigaBlur_in;
-	delete matGigaBlur_out;
 
+	matrixImage<float> *matGBlur1_save = new matrixImage<float>(matImg1->width,matImg1->height);
+	matGBlur1_save->copy(matGBlur1);
+
+	matGBlur1->abs_diff(matGBlur2);
+
+	matrixImage<uchar3> *matGray_out = matFloatToMatUchar3(matGray1);
+	write_image(matGray_out, "grayscale.png");
+	matrixImage<uchar3> *matGBlur_out = matFloatToMatUchar3(matGBlur1_save);
+	write_image(matGBlur_out, "gaussian_blur.png");
+	matrixImage<uchar3> *matGigaBlur_out = matFloatToMatUchar3(matGigaBlur1);
+	write_image(matGigaBlur_out, "giga_blur.png");
+
+	delete matImg1;
+	delete matImg2;
+	delete matGray1;
+	delete matGray2;
+	delete matGray_out;
+	delete matGigaBlur_tmp;
+	delete matGBlur1;
+	delete matGBlur2;
+	delete matGBlur1_save;
+	delete matGBlur_out;
+	delete matGigaBlur1;
+	delete matGigaBlur_out;
 }

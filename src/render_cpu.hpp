@@ -12,7 +12,7 @@
 
 
 
-void useCpu(gil::rgb8_image_t &image);
+void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2);
 
 
 void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out);
