@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector>
 #include <vector_types.h>
+#include <algorithm>
 #include <boost/gil/image.hpp>
 #include <boost/gil/typedefs.hpp>
 #include <boost/gil/image.hpp>
@@ -10,7 +11,7 @@
 #include <boost/gil/extension/io/png/write.hpp>
 #include <boost/gil/extension/io/png.hpp>
 
-void
+	void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
 {
 	spdlog::error("{} ({},file: {}, line: {})", msg, filename, fname, line);
@@ -95,6 +96,7 @@ void gaussianBlur(
 		matrixImage<float> *buf_in,
 		matrixImage<float> *buf_out)
 {
+	spdlog::info("Gaussian Blurring.");
 	const size_t kernel_size = 3; //FIXME change kernel and kernel size to a
 				      //struct an define a kernel generator
 				      //function of its size
@@ -111,12 +113,85 @@ void gaussianBlur(
 	}
 }
 
+
+float pxDilationErosion(matrixImage<float> *matImg,
+		const size_t w,
+		const size_t h,
+		const size_t se_w,
+		const size_t se_h,
+		const bool d_or_e)
+{
+	//FIXME maybe change the way the structuring element is used. Use square
+	// centered around current pixel instead of the current pixel being in a corner.
+
+	/*
+	 * d_or_e == true => dilation, else erosion.
+	 */
+	float max_value = 0.f;
+	float min_value = 256.f;
+	size_t off_w = se_w / 2;
+	size_t off_h = se_h / 2;
+	for (size_t sw = 0; sw + w - off_w < matImg->width && sw < se_w; sw++)
+	{
+		if (sw + w < off_w)
+			continue;
+		for (size_t sh = 0; sh + h - off_h < matImg->height && sh < se_h; sh++)
+		{
+			if (sh + h < off_h)
+				continue;
+			max_value = std::max(max_value, *(matImg->at(sw + w - off_w, sh + h - off_h)));
+			min_value = std::min(min_value, *(matImg->at(sw + w - off_w, sh + h - off_h)));
+		}
+	}
+	if (d_or_e)
+		return max_value;
+	return min_value;
+}
+void dilationErosion(matrixImage<float> *mat_in,
+		matrixImage<float> *mat_out,
+		const size_t se_w,
+		const size_t se_h,
+		const bool d_or_e)
+{
+	/*
+	 * d_or_e== true => dilation, else erosion
+	 */
+
+
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_out->height; h++)
+		{
+			float value = pxDilationErosion(mat_in, w, h, se_w, se_h, d_or_e);
+			mat_out->set(w, h, value);
+		}
+	}
+}
+
+//FIXME atm, only rectangle structuring elements with unique pixel center
+//	used. check if disks would be better.
+void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t se_w, size_t se_h)
+{
+	spdlog::info("Morphological Opening");
+	dilationErosion(mat_in, mat_out, se_w, se_h, false);
+	dilationErosion(mat_in, mat_out, se_w, se_h, true);
+}
+void morphClosing(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t se_w, size_t se_h)
+{
+	spdlog::info("Morphological Closing");
+	dilationErosion(mat_in, mat_out, se_w, se_h, true);
+	dilationErosion(mat_in, mat_out, se_w, se_h, false);
+}
+
+
+
+//FIXME maybe try to change all operations so we just need an in matrix.
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
 	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
 	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,matImg1->height);
 	toGrayscale(matImg1, matGray1);
-	
+
 	matrixImage<uchar3> *matImg2 = toMatrixImage(image2);
 	matrixImage<float> *matGray2 = new matrixImage<float>(matImg2->width,matImg2->height);
 	toGrayscale(matImg2, matGray2);
@@ -142,6 +217,11 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 
 	matGBlur1->abs_diff(matGBlur2);
 
+	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,matImg1->height);
+	morphOpening(matGBlur1, matOpening, 20, 20);
+	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,matImg1->height);
+	morphClosing(matOpening, matClosing, 50, 50);
+
 	matrixImage<uchar3> *matGray_out = matFloatToMatUchar3(matGray1);
 	write_image(matGray_out, "grayscale.png");
 	matrixImage<uchar3> *matGBlur_out = matFloatToMatUchar3(matGBlur1_save);
@@ -161,4 +241,6 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	delete matGBlur_out;
 	delete matGigaBlur1;
 	delete matGigaBlur_out;
+	delete matOpening;
+	delete matClosing;
 }
