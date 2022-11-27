@@ -14,7 +14,9 @@ __device__ T *eltPtr(T *baseAddress, size_t col, size_t row, size_t pitch)
 	return (T *) ((char *) baseAddress + row * pitch +
 				  col * sizeof(T));  // FIXME
 }
-__global__ void grayscale(uchar3 *matImg, size_t width, size_t height, size_t pitch)
+
+__global__ void
+grayscale(uchar3 *matImg, size_t width, size_t height, size_t pitch)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -26,8 +28,9 @@ __global__ void grayscale(uchar3 *matImg, size_t width, size_t height, size_t pi
 	uchar3 *px_in = eltPtr<uchar3>(matImg, idx, idy, pitch);
 	char px_out = ceil(0.3 * px_in->x + 0.59 * px_in->y + 0.11 * px_in->z);
 	uchar3 newVal = createUchar3(px_out, px_out, px_out);
-	matImg[idx] = newVal;
+	*px_in = newVal;
 }
+
 /*
 __global__ void
 pxGaussianBlur(uchar3 *matImg, uchar3 *matOut, size_t width, size_t height,
@@ -85,12 +88,11 @@ void use_gpu(gil::rgb8_image_t &image)
 
 
 	dim3 threads(32, 32);
-	dim3 blocks((matImg->width+threads.x -1) / (threads.x+matImg->height-1), matImg->height / threads.y);
-	//grayscale<<<1024,(matImg->width$la>>>(matImg->buffer, matImg->width, matImg->height);
+	dim3 blocks((matImg->width + threads.x - 1) / threads.x,
+				(matImg->height + threads.y - 1) / threads.y);
 	spdlog::info("Lunching Grayscale");
-	/*
-	grayscale<<<threads, blocks>>>(matImg->buffer, matImg->width,
-										 matImg->height,matImg->pitch);
+	grayscale<<<blocks, threads>>>(matImg->buffer, matImg->width,
+								   matImg->height, matImg->pitch);
 	cudaError_t err = cudaDeviceSynchronize();
 	if (err != cudaSuccess)
 	{
@@ -98,7 +100,6 @@ void use_gpu(gil::rgb8_image_t &image)
 					  cudaGetErrorString(err));
 		std::exit(1);
 	}
-	 */
 	spdlog::info("Lunching Gaussian Blur");
 	/*
 	matrixImage<uchar3> *matOut = matImg->deepCopy();
