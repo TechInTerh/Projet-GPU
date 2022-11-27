@@ -13,11 +13,13 @@ struct matrixImage
 	size_t width;
 	size_t height;
 	bool isGPU;
+	size_t pitch;
 
 	matrixImage(size_t width, size_t height) : width(width), height(height)
 	{
 		isGPU = false;
 		buffer = new T[width * height];
+		pitch = width * sizeof(T);
 	}
 
 	__device__ __host__ //Avaible in both CPU and GPU.
@@ -39,11 +41,10 @@ struct matrixImage
 		if (isGPU)
 		{
 			return;
-		}
-		T *gpuBuffer;
-		cudaMalloc(&gpuBuffer, width * height * sizeof(T));
-		cudaMemcpy(gpuBuffer, buffer, width * height * sizeof(T),
-				   cudaMemcpyHostToDevice);
+		};
+		T *gpuBuffer = (uchar3 *) cudaMallocPitchX(&pitch, width*sizeof(T), height);
+		cudaMemcpy2DX(gpuBuffer, pitch, buffer, width * sizeof(T), width*sizeof(T),
+					  height, cudaMemcpyHostToDevice);
 
 		delete[] buffer;
 
@@ -58,9 +59,11 @@ struct matrixImage
 			return;
 		}
 		T *cpuBuffer = new T[width * height];
-		cudaMemcpy(cpuBuffer, buffer, width * height * sizeof(T),
-				   cudaMemcpyDeviceToHost);
-		cudaFree(buffer);
+		cudaMemcpy2DX(cpuBuffer, width * sizeof(T),
+					  buffer, pitch,
+					  width *sizeof(T),height,cudaMemcpyDeviceToHost);
+		cudaFreeX(buffer);
+		pitch = width*sizeof(T);
 		buffer = cpuBuffer;
 		isGPU = false;
 	}
@@ -75,14 +78,14 @@ struct matrixImage
 		matrixImage<T> *newMat = new matrixImage<T>(width, height);
 		if (isGPU)
 		{
-			cudaMemcpy(newMat->buffer, buffer, width * height * sizeof(T),
-					   cudaMemcpyDeviceToDevice);
-			newMat->isGPU = true;
+			newMat->toGpu();
+			cudaMemcpy2DX(newMat->buffer, newMat->pitch, buffer, pitch,
+						  width * sizeof(T), height,
+						  cudaMemcpyDeviceToDevice);
 		}
 		else
 		{
-			cudaMemcpy(newMat->buffer, buffer, width * height * sizeof(T),
-					   cudaMemcpyHostToHost);
+			memcpy(newMat->buffer, buffer, width * height * sizeof(T));
 		}
 		return newMat;
 	}

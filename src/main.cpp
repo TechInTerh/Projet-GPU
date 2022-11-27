@@ -25,10 +25,7 @@ gil::rgb8_image_t loadImage(const std::string &path)
 
 int main()
 {
-	std::cout << BOOST_LIB_VERSION << '\n';
-
 	gil::rgb8_image_t image = loadImage("img/img_1.png");
-	writeImage("img/test.png", image);
 #if (USE_GPU)
 	spdlog::info("Using GPU");
 	use_gpu(image);
