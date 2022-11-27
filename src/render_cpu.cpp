@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector>
 #include <vector_types.h>
+#include <algorithm>
 #include <boost/gil/image.hpp>
 #include <boost/gil/typedefs.hpp>
 #include <boost/gil/image.hpp>
@@ -95,6 +96,7 @@ void gaussianBlur(
 		matrixImage<float> *buf_in,
 		matrixImage<float> *buf_out)
 {
+	spdlog::info("Gaussian Blurring.");
 	const size_t kernel_size = 3; //FIXME change kernel and kernel size to a
 				      //struct an define a kernel generator
 				      //function of its size
@@ -112,79 +114,78 @@ void gaussianBlur(
 }
 
 
-void px_dilation(matrixImage<float> *matImg, const size_t se_w, const size_t se_h, const size_t w, const size_t h)
+float pxDilationErosion(matrixImage<float> *matImg,
+		const size_t w,
+		const size_t h,
+		const size_t se_w,
+		const size_t se_h,
+		const bool d_or_e)
 {
 	//FIXME maybe change the way the structuring element is used. Use square
 	// centered around current pixel instead of the current pixel being in a corner.
-	float *anchor_px = matImg->at(w, h);
-	if (*anchor_px < ERROR_MARGIN)
-	{
-		*anchor_px = 0.f;
-		return;
-	}
-	for (size_t sw = 0; sw + w < matImg->width && sw < se_w; sw++)
-	{
-		for (size_t sh = 0; sh + h - offset < matImg->height && sh < se_h; sh++)
-		{
-			matImg->set(w + sw, h + sh, *anchor_px);
-		}
-	}
-}
-void dilation(matrixImage<float> *matImg, const size_t se_w, const size_t se_h)
-{
-	size_t offset_w = se_w / 2;
-	size_t offset_h = se_h / 2;
 
-	for (size_t w = 0; w < matImg->width; w++)
+	/*
+	 * d_or_e == true => dilation, else erosion.
+	 */
+	float max_value = 0.f;
+	float min_value = 256.f;
+	size_t off_w = se_w / 2;
+	size_t off_h = se_h / 2;
+	for (size_t sw = 0; sw + w - off_w < matImg->width && sw < se_w; sw++)
 	{
-		for (size_t h = 0; h < matImg->height; h++)
+		if (sw + w < off_w)
+			continue;
+		for (size_t sh = 0; sh + h - off_h < matImg->height && sh < se_h; sh++)
 		{
-			px_dilation(matImg, se_w, se_h, w, h, offset);
+			if (sh + h < off_h)
+				continue;
+			max_value = std::max(max_value, *(matImg->at(sw + w - off_w, sh + h - off_h)));
+			min_value = std::min(min_value, *(matImg->at(sw + w - off_w, sh + h - off_h)));
 		}
 	}
+	if (d_or_e)
+		return max_value;
+	return min_value;
 }
+void dilationErosion(matrixImage<float> *mat_in,
+		matrixImage<float> *mat_out,
+		const size_t se_w,
+		const size_t se_h,
+		const bool d_or_e)
+{
+	/*
+	 * d_or_e== true => dilation, else erosion
+	 */
 
-void px_erosion(matrixImage<float> *matImg, size_t se_w, size_t se_h, size_t w, size_t h)
-{
-	//FIXME maybe change the way the structuring element is used. Use square
-	// centered around current pixel instead of the current pixel being in a corner.
-	float *anchor_px = matImg->at(w, h);
-	if (*anchor_px < ERROR_MARGIN)
+
+	for (size_t w = 0; w < mat_in->width; w++)
 	{
-		*anchor_px = 0.f;
-		return;
-	}
-	for (size_t sw = 0; sw + w < matImg->width && sw < se_w; sw++)
-	{
-		for (size_t sh = 0; sh + h < matImg->height && sh < se_h; sh++)
+		for (size_t h = 0; h < mat_out->height; h++)
 		{
-			float *cur_px = matImg->at(sw + w, sh + h);
-			if (*cur_px > ERROR_MARGIN)
-				*cur_px = 0.f;
+			float value = pxDilationErosion(mat_in, w, h, se_w, se_h, d_or_e);
+			mat_out->set(w, h, value);
 		}
 	}
-}
-void erosion(matrixImage<float> *matImg, size_t se_w, size_t se_h)
-{
-	for (size_t w = 0; w < matImg->width; w++)
-	{
-		for (size_t h = 0; h < matImg->height; h++)
-		{
-			px_erosion(matImg, se_w, se_h, w, h);
-		}
-	}
-}
-void opening(matrixImage<float> *matImg, size_t se_w, size_t se_h)
-{
-	erosion(matImg, se_w, se_h);
-	dilation(matImg, se_w, se_h);
-}
-void closing(matrixImage<float> *matImg, size_t se_w, size_t se_h)
-{
-	dilation(matImg, se_w, se_h);
-	erosion(matImg, se_w, se_h);
 }
 
+//FIXME atm, only rectangle structuring elements with unique pixel center
+//	used. check if disks would be better.
+void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t se_w, size_t se_h)
+{
+	spdlog::info("Morphological Opening");
+	dilationErosion(mat_in, mat_out, se_w, se_h, false);
+	dilationErosion(mat_in, mat_out, se_w, se_h, true);
+}
+void morphClosing(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t se_w, size_t se_h)
+{
+	spdlog::info("Morphological Closing");
+	dilationErosion(mat_in, mat_out, se_w, se_h, true);
+	dilationErosion(mat_in, mat_out, se_w, se_h, false);
+}
+
+
+
+//FIXME maybe try to change all operations so we just need an in matrix.
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
 	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
@@ -215,7 +216,11 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	matGBlur1_save->copy(matGBlur1);
 
 	matGBlur1->abs_diff(matGBlur2);
-	closing(matGBlur1, 2, 2);
+
+	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,matImg1->height);
+	morphOpening(matGBlur1, matOpening, 20, 20);
+	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,matImg1->height);
+	morphClosing(matOpening, matClosing, 50, 50);
 
 	matrixImage<uchar3> *matGray_out = matFloatToMatUchar3(matGray1);
 	write_image(matGray_out, "grayscale.png");
@@ -236,4 +241,6 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	delete matGBlur_out;
 	delete matGigaBlur1;
 	delete matGigaBlur_out;
+	delete matOpening;
+	delete matClosing;
 }
