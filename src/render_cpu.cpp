@@ -112,7 +112,7 @@ void gaussianBlur(
 }
 
 
-void px_dilation(matrixImage<float> *matImg, size_t se_w, size_t se_h, size_t w, size_t h)
+void px_dilation(matrixImage<float> *matImg, const size_t se_w, const size_t se_h, const size_t w, const size_t h)
 {
 	//FIXME maybe change the way the structuring element is used. Use square
 	// centered around current pixel instead of the current pixel being in a corner.
@@ -124,19 +124,22 @@ void px_dilation(matrixImage<float> *matImg, size_t se_w, size_t se_h, size_t w,
 	}
 	for (size_t sw = 0; sw + w < matImg->width && sw < se_w; sw++)
 	{
-		for (size_t sh = 0; sh + h < matImg->height && sh < se_h; sh++)
+		for (size_t sh = 0; sh + h - offset < matImg->height && sh < se_h; sh++)
 		{
 			matImg->set(w + sw, h + sh, *anchor_px);
 		}
 	}
 }
-void dilation(matrixImage<float> *matImg, size_t se_w, size_t se_h)
+void dilation(matrixImage<float> *matImg, const size_t se_w, const size_t se_h)
 {
+	size_t offset_w = se_w / 2;
+	size_t offset_h = se_h / 2;
+
 	for (size_t w = 0; w < matImg->width; w++)
 	{
 		for (size_t h = 0; h < matImg->height; h++)
 		{
-			px_dilation(matImg, se_w, se_h, w, h);
+			px_dilation(matImg, se_w, se_h, w, h, offset);
 		}
 	}
 }
