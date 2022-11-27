@@ -62,7 +62,7 @@ void pxGaussianBlur(
 	float px = 0;
 	for (size_t k_w = 0; k_w < kernel_size; k_w++)
 	{
-		for (size_t k_h = 0; k_h < kernel_size; k_w++)
+		for (size_t k_h = 0; k_h < kernel_size; k_h++)
 		{
 			float *px_tmp = buf_in->at(x + k_w - offset, y + k_w - offset);
 			float k_elt = kernel[k_h][k_w];

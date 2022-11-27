@@ -25,6 +25,7 @@ struct matrixImage
 	{
 		return &buffer[y * width + x];
 	}
+
 	__device__ __host__
 	void set(size_t w, size_t h, T value)
 	{
@@ -68,6 +69,37 @@ struct matrixImage
 	{
 		return isGPU;
 	}
+
+	matrixImage<T> *deepCopy()
+	{
+		matrixImage<T> *newMat = new matrixImage<T>(width, height);
+		if (isGPU)
+		{
+			cudaMemcpy(newMat->buffer, buffer, width * height * sizeof(T),
+					   cudaMemcpyDeviceToDevice);
+			newMat->isGPU = true;
+		}
+		else
+		{
+			cudaMemcpy(newMat->buffer, buffer, width * height * sizeof(T),
+					   cudaMemcpyHostToHost);
+		}
+		return newMat;
+	}
+
+	//destructor
+	~matrixImage()
+	{
+		if (isGPU)
+		{
+			cudaFree(buffer);
+		}
+		else
+		{
+			delete[] buffer;
+		}
+	}
+
 };
 
 matrixImage<uchar3> *toMatrixImage(gil::rgb8_image_t &image);
@@ -76,4 +108,5 @@ void write_image(matrixImage<uchar3> *matImage);
 
 __device__ __host__
 uchar3 createUchar3(unsigned char r, unsigned char g, unsigned char b);
+
 #endif //GPGPU_MATRIX_IMAGE_CUH

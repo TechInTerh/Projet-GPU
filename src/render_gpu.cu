@@ -17,6 +17,19 @@ __global__ void grayscale(uchar3 *matImg, size_t width, size_t height)
 	matImg[idx] = newVal;
 }
 
+__global__ void
+pxGaussianBlur(uchar3 *matImg, uchar3 *matOut, size_t width, size_t height)
+{
+	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= width * height)
+	{
+		return;
+	}
+	uchar3 px_in = matImg[idx];
+	uchar3 newVal = createUchar3(px_in.x, px_in.y, px_in.z);
+	matImg[idx] = newVal;
+}
 
 
 void use_gpu(gil::rgb8_image_t &image)
@@ -25,16 +38,32 @@ void use_gpu(gil::rgb8_image_t &image)
 	matImg->toGpu();
 
 
-	size_t size_block= 1024;
-	size_t size_grid = (matImg->width * matImg->height + size_block - 1) / size_block;
+	size_t size_block = 1024;
+	size_t size_grid =
+			(matImg->width * matImg->height + size_block - 1) / size_block;
 	//grayscale<<<1024,(matImg->width$la>>>(matImg->buffer, matImg->width, matImg->height);
-	grayscale<<<size_grid,size_block>>>(matImg->buffer,matImg->width,matImg->height);
+	grayscale<<<size_grid, size_block>>>(matImg->buffer, matImg->width,
+										 matImg->height);
 	cudaError_t err = cudaDeviceSynchronize();
 	if (err != cudaSuccess)
 	{
-		spdlog::error("Error in cudaDeviceSynchronize: {}", cudaGetErrorString(err));
+		spdlog::error("Error in cudaDeviceSynchronize: {}",
+					  cudaGetErrorString(err));
+		std::exit(1);
+	}
+
+	matrixImage<uchar3> *matOut = matImg->deepCopy();
+	pxGaussianBlur<<<size_grid, size_block>>>(matImg->buffer, matOut->buffer,
+											  matImg->width, matImg->height);
+
+	err = cudaDeviceSynchronize();
+	if (err != cudaSuccess)
+	{
+		spdlog::error("Error in cudaDeviceSynchronize: {}",
+					  cudaGetErrorString(err));
 		std::exit(1);
 	}
 	matImg->toCpu();
 	write_image(matImg);
+	delete matImg;
 }
