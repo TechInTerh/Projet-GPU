@@ -31,55 +31,42 @@ grayscale(uchar3 *matImg, size_t width, size_t height, size_t pitch)
 	*px_in = newVal;
 }
 
-/*
 __global__ void
-pxGaussianBlur(uchar3 *matImg, uchar3 *matOut, size_t width, size_t height,
-			   size_t kernel_size)
+gaussianBlur(uchar3 *matIn, uchar3 *matOut, size_t width, size_t height,
+			 size_t pitch)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (idx >= width * height)
+	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+	if (idx > width || idy > height)
 	{
 		return;
 	}
-	uchar3 px_in = matImg[idx];
-	size_t new_x = 0;
-	size_t new_y = 0;
-	size_t new_z = 0;
-	float kernel_value = 1;
-	for (int k_w = 0; k_w < kernel_size; k_w++)
+	const size_t kernel_size = 3;
+	const float ker[kernel_size][kernel_size] = {{0.0625, 0.125, 0.0625},
+												 {0.125,  0.25,  0.125},
+												 {0.0625, 0.125, 0.0625}};
+	uchar3 *px_out = eltPtr<uchar3>(matOut, idx, idy, pitch);
+	float px_x = 0;
+	float px_y = 0;
+	float px_z = 0;
+	for (size_t k_w = 0; k_w < kernel_size; k_w++)
 	{
-		for (int k_h = 0; k_h < kernel_size; k_h++)
+		for (size_t k_h = 0; k_h < kernel_size; k_h++)
 		{
-			size_t cur_loc =
-					idx + (k_h - (size_t) ceil(kernel_size / 2)) * width +
-					(k_w - (size_t) ceil(kernel_size / 2));
-			if (cur_loc >= width * height)
+			if (idx + k_w - 1 < width && idy + k_h - 1 < height)
 			{
-				continue;
-			}
-			uchar3 px_tmp = matImg[cur_loc];
-			for (int i = 0; i < 3; i++)
-			{
-				new_x += px_tmp.x * kernel_value;
-				new_y += px_tmp.y * kernel_value;
-				new_z += px_tmp.z * kernel_value;
+				uchar3 *px_in = eltPtr<uchar3>(matIn, idx + k_w - 1,
+											   idy + k_h - 1, pitch);
+				px_x += px_in->x * ker[k_w][k_h];
+				px_y += px_in->y * ker[k_w][k_h];
+				px_z += px_in->z * ker[k_w][k_h];
 			}
 		}
 	}
-	for (int i = 0; i < 3; i++)
-	{
-		new_x /= kernel_size * kernel_size;
-		new_y /= kernel_size * kernel_size;
-		new_z /= kernel_size * kernel_size;
-		px_in.x = (char) new_x;
-		px_in.y = (char) new_y;
-		px_in.z = (char) new_z;
-	}
+	uchar3 newVal = createUchar3((char) px_x, (char) px_y, (char) px_z);
+	*px_out = newVal;
 
-	matOut[idx] = px_in;
 }
-*/
 
 void use_gpu(gil::rgb8_image_t &image)
 {
@@ -101,24 +88,27 @@ void use_gpu(gil::rgb8_image_t &image)
 		std::exit(1);
 	}
 	spdlog::info("Lunching Gaussian Blur");
-	/*
 	matrixImage<uchar3> *matOut = matImg->deepCopy();
-	pxGaussianBlur<<<size_grid, size_block>>>(matImg->buffer, matOut->buffer,
-											  matImg->width, matImg->height,1);
-
-	err = cudaDeviceSynchronize();
-	if (err != cudaSuccess)
+	for (int i = 0; i < 20; i++)
 	{
-		spdlog::error("Error in cudaDeviceSynchronize: {}",
-					  cudaGetErrorString(err));
-		std::exit(1);
+		gaussianBlur<<<blocks, threads>>>(matImg->buffer, matOut->buffer,
+										  matImg->width, matImg->height,
+										  matImg->pitch);
+		cudaError_t err = cudaDeviceSynchronize();
+		if (err != cudaSuccess)
+		{
+			spdlog::error("Error in cudaDeviceSynchronize: {}",
+						  cudaGetErrorString(err));
+			std::exit(1);
+		}
+		matrixImage<uchar3> *tmp = matImg;
+		matImg = matOut;
+		matOut = tmp;
 	}
-	 */
-	matImg->toCpu();
-	spdlog::info("Copying on CPU");
-	//matOut->toCpu();
 
-	write_image(matImg);
+	matOut->toCpu();
+	spdlog::info("Copying on CPU");
+	write_image(matOut);
 	delete matImg;
-	//delete matOut;
+	delete matOut;
 }
