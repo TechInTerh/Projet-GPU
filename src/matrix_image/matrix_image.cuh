@@ -42,7 +42,7 @@ struct matrixImage
 		{
 			return;
 		};
-		T *gpuBuffer = (uchar3 *) cudaMallocPitchX(&pitch, width*sizeof(T), height);
+		T *gpuBuffer = (T *) cudaMallocPitchX(&pitch, width*sizeof(T), height);
 		cudaMemcpy2DX(gpuBuffer, pitch, buffer, width * sizeof(T), width*sizeof(T),
 					  height, cudaMemcpyHostToDevice);
 
@@ -141,5 +141,6 @@ void write_image(matrixImage<uchar3> *matImage, const char *filename);
 
 __device__ __host__
 uchar3 createUchar3(unsigned char r, unsigned char g, unsigned char b);
+matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn);
 
 #endif //GPGPU_MATRIX_IMAGE_CUH

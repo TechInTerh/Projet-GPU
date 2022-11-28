@@ -16,7 +16,8 @@ __device__ T *eltPtr(T *baseAddress, size_t col, size_t row, size_t pitch)
 }
 
 __global__ void
-grayscale(uchar3 *matImg, size_t width, size_t height, size_t pitch)
+grayscale(uchar3 *matImg, float *matOut, size_t width, size_t height,
+		  size_t pitch)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -26,13 +27,13 @@ grayscale(uchar3 *matImg, size_t width, size_t height, size_t pitch)
 		return;
 	}
 	uchar3 *px_in = eltPtr<uchar3>(matImg, idx, idy, pitch);
-	char px_out = ceil(0.3 * px_in->x + 0.59 * px_in->y + 0.11 * px_in->z);
-	uchar3 newVal = createUchar3(px_out, px_out, px_out);
-	*px_in = newVal;
+	float val_out = 0.3 * px_in->x + 0.59 * px_in->y + 0.11 * px_in->z;
+	float *px_out = eltPtr<float>(matOut, idx, idy, width * sizeof(float));
+	*px_out = val_out;
 }
 
 __global__ void
-gaussianBlur(uchar3 *matIn, uchar3 *matOut, size_t width, size_t height,
+gaussianBlur(float *matIn,float *matOut, size_t width, size_t height,
 			 size_t pitch)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -45,26 +46,21 @@ gaussianBlur(uchar3 *matIn, uchar3 *matOut, size_t width, size_t height,
 	const float ker[kernel_size][kernel_size] = {{0.0625, 0.125, 0.0625},
 												 {0.125,  0.25,  0.125},
 												 {0.0625, 0.125, 0.0625}};
-	uchar3 *px_out = eltPtr<uchar3>(matOut, idx, idy, pitch);
-	float px_x = 0;
-	float px_y = 0;
-	float px_z = 0;
+	float val_out = 0;
 	for (size_t k_w = 0; k_w < kernel_size; k_w++)
 	{
 		for (size_t k_h = 0; k_h < kernel_size; k_h++)
 		{
-			if (idx + k_w  <= width && idy + k_h <= height)
+			if (idx + k_w-1 < width+1 && idy + k_h-1 < height+1)
 			{
-				uchar3 *px_in = eltPtr<uchar3>(matIn, idx + k_w - 1,
+				float *px_in = eltPtr<float>(matIn, idx + k_w - 1,
 											   idy + k_h - 1, pitch);
-				px_x += px_in->x * ker[k_w][k_h];
-				px_y += px_in->y * ker[k_w][k_h];
-				px_z += px_in->z * ker[k_w][k_h];
+				val_out += *px_in * ker[k_w][k_h];
 			}
 		}
 	}
-	uchar3 newVal = createUchar3((char) px_x, (char) px_y, (char) px_z);
-	*px_out = newVal;
+	float *px_out = eltPtr<float>(matOut, idx, idy, pitch);
+	*px_out = val_out;
 
 }
 
@@ -78,25 +74,35 @@ void use_gpu(gil::rgb8_image_t &image)
 	dim3 blocks((matImg->width + threads.x - 1) / threads.x,
 				(matImg->height + threads.y - 1) / threads.y);
 	spdlog::info("Lunching Grayscale");
-	grayscale<<<blocks, threads>>>(matImg->buffer, matImg->width,
-								   matImg->height, matImg->pitch);
+	matrixImage<float> *matGray = new matrixImage<float>(matImg->width,
+														 matImg->height);
+	matGray->toGpu();
+	grayscale<<<blocks, threads>>>(
+			matImg->buffer, matGray->buffer,
+			matImg->width,matImg->height, matImg->pitch);
 	cudaDeviceSynchronizeX();
+	delete matImg;
+
+
 	spdlog::info("Lunching Gaussian Blur");
-	matrixImage<uchar3> *matOut = matImg->deepCopy();
-	for (int i = 0; i < 200; i++)
+	matrixImage<float> *matBlur = matGray->deepCopy();
+	for (int i = 0; i < 201; i++)
 	{
-		gaussianBlur<<<blocks, threads>>>(matImg->buffer, matOut->buffer,
-										  matImg->width, matImg->height,
-										  matImg->pitch);
+		gaussianBlur<<<blocks, threads>>>(matGray->buffer, matBlur->buffer,
+										  matGray->width, matGray->height,
+										  matGray->pitch);
 		cudaDeviceSynchronizeX();
-		matrixImage<uchar3> *tmp = matImg;
-		matImg = matOut;
-		matOut = tmp;
+		matrixImage<float> *tmp = matBlur;
+		matBlur = matGray;
+		matGray = tmp;
 	}
 
-	matOut->toCpu();
 	spdlog::info("Copying on CPU");
-	write_image(matOut,"img.png");
+	matBlur->toCpu();
+	matImg = matFloatToMatUchar3(matBlur);
+	spdlog::info("Writing image");
+	write_image(matImg, "img.png");
+	delete matBlur;
 	delete matImg;
-	delete matOut;
+	delete matGray;
 }
