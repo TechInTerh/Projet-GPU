@@ -165,23 +165,94 @@ void lunch_abs_diff(matrixImage<float> *matBlur1, matrixImage<float> *matBlur2,
 	cudaDeviceSynchronizeX();
 }
 
+__device__ float my_max(float a, float b)
+{
+	return a > b ? a : b;
+}
+
+__device__ float my_min(float a, float b)
+{
+	return a < b ? a : b;
+}
+
+__global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
+								  size_t height, size_t pitch, size_t se_w,
+								  size_t se_h, bool d_or_e)
+{
+	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+	if (idx > width || idy > height)
+	{
+		return;
+	}
+	float max_value = 0.f;
+	float min_value = 255.f;
+	size_t off_w = se_w / 2;
+	size_t off_h = se_h / 2;
+	for (size_t sw = 0; sw < se_w; sw++)
+	{
+		for (size_t sh = 0; sh < se_h; sh++)
+		{
+			if (idx + sw - off_w < width && idy + sh - off_h < height)
+			{
+				float *px_in = eltPtr<float>(matIn, idx + sw - off_w,
+											 idy + sh - off_h, pitch);
+				if (d_or_e)
+					max_value = my_max(max_value, *px_in);
+
+				else
+					min_value = my_min(min_value, *px_in);
+
+			}
+		}
+	}
+	float *px_out = eltPtr<float>(matOut, idx, idy, pitch);
+	if (d_or_e)
+		*px_out = max_value;
+	else
+		*px_out = min_value;
+}
+
+
+void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
+							   dim3 blocks)
+{
+	spdlog::info("Lunching morph opening");
+	matrixImage<float> *matOut = matIn->deepCopy();
+	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch, 20, 20, true);
+	cudaDeviceSynchronizeX();
+	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch, 20, 20, false);
+	cudaDeviceSynchronizeX();
+	spdlog::info("Lunching morph closing");
+	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch, 50, 50, false);
+
+	cudaDeviceSynchronizeX();
+	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch, 50, 50, true);
+	cudaDeviceSynchronizeX();
+}
+
 void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 {
-
 	dim3 threads(32, 32);
 	dim3 blocks((image.width() + threads.x - 1) / threads.x,
 				(image.height() + threads.y - 1) / threads.y);
-	matrixImage<float> *matBlur1 = grayBlur(image, 1,threads,blocks);
-	matrixImage<float> *matBlur2 = grayBlur(image2, 1,threads,blocks);
+	matrixImage<float> *matBlur1 = grayBlur(image, 1, threads, blocks);
+	matrixImage<float> *matBlur2 = grayBlur(image2, 1, threads, blocks);
 	lunch_abs_diff(matBlur1, matBlur2, threads, blocks);
+	launchMorphOpeningClosing(matBlur2, threads, blocks);
 	matBlur2->toCpu();
 	matrixImage<uchar3> *matImg = matFloatToMatUchar3(matBlur2);
 	spdlog::info("Writing image");
-	write_image(matImg,"img.png");
-
+	write_image(matImg, "img.png");
 	delete matBlur1;
 	delete matImg;
 	delete matBlur2;
-
-
 }
