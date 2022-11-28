@@ -48,3 +48,20 @@ uchar3 createUchar3(unsigned char r, unsigned char g, unsigned char b)
 	ret.z = b;
 	return ret;
 }
+matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn)
+{
+	spdlog::info("Converting to uchar3");
+	matrixImage<uchar3> *matOut = new matrixImage<uchar3>(matIn->width,matIn->height);
+	for (size_t w = 0; w < matIn->width; w++)
+	{
+		for (size_t h = 0; h < matIn->height; h++)
+		{
+			uchar3 val = uchar3();
+			val.x = ceil(*matIn->at(w,h));
+			val.y = val.x;
+			val.z = val.x;
+			matOut->set(w,h, val);
+		}
+	}
+	return matOut;
+}

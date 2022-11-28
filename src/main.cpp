@@ -2,7 +2,7 @@
 #include "render_gpu.cuh"
 #include "render_cpu.hpp"
 #include <spdlog/spdlog.h>
-#define USE_GPU false
+#define USE_GPU true
 namespace gil = boost::gil;
 
 

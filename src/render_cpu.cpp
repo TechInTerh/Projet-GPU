@@ -5,12 +5,7 @@
 #include <vector_types.h>
 #include <algorithm>
 #include <math.h>
-#include <boost/gil/image.hpp>
 #include <boost/gil/typedefs.hpp>
-#include <boost/gil/image.hpp>
-#include <boost/gil/extension/io/png/read.hpp>
-#include <boost/gil/extension/io/png/write.hpp>
-#include <boost/gil/extension/io/png.hpp>
 
 	void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
@@ -20,23 +15,6 @@ _abortError(const char *msg, const char *filename, const char *fname, int line)
 }
 
 
-matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn)
-{
-	spdlog::info("Converting to uchar3");
-	matrixImage<uchar3> *matOut = new matrixImage<uchar3>(matIn->width,matIn->height);
-	for (size_t w = 0; w < matIn->width; w++)
-	{
-		for (size_t h = 0; h < matIn->height; h++)
-		{
-			uchar3 val = uchar3();
-			val.x = ceil(*matIn->at(w,h));
-			val.y = val.x;
-			val.z = val.x;
-			matOut->set(w,h, val);
-		}
-	}
-	return matOut;
-}
 void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out)
 {
 	spdlog::info("To Grayscale");
