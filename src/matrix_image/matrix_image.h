@@ -62,7 +62,9 @@ struct matrixImage
 		{
 			for (size_t h = 0; h < height; h++)
 			{
-				T diff = std::abs(this->at(w,h) - mat_diff->at(w, h));
+				T *left_px = this->at(w,h);
+				T *right_px = mat_diff->at(w, h);
+				T diff = std::abs(*left_px - *right_px);
 				this->set(w, h, diff);
 			}
 		}
