@@ -148,6 +148,22 @@ grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks)
 	return matBlur;
 }
 
+/**
+ * @brief Compute the absolute difference between two matrix, stocking the result in "@param matBlur2"
+ * @param matBlur1
+ * @param matBlur2
+ * @param threads
+ * @param blocks
+ */
+void lunch_abs_diff(matrixImage<float> *matBlur1, matrixImage<float> *matBlur2,
+					dim3 threads, dim3 blocks)
+{
+	spdlog::info("Lunching abs diff");
+	abs_diff<<<blocks, threads>>>(matBlur1->buffer, matBlur2->buffer,
+								  matBlur2->width, matBlur2->height,
+								  matBlur2->pitch);
+	cudaDeviceSynchronizeX();
+}
 
 void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 {
@@ -157,11 +173,7 @@ void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 				(image.height() + threads.y - 1) / threads.y);
 	matrixImage<float> *matBlur1 = grayBlur(image, 1,threads,blocks);
 	matrixImage<float> *matBlur2 = grayBlur(image2, 1,threads,blocks);
-	spdlog::info("Lunching abs diff");
-	abs_diff<<<blocks, threads>>>(matBlur1->buffer, matBlur2->buffer,
-								  matBlur1->width, matBlur1->height,
-								  matBlur1->pitch);
-	cudaDeviceSynchronizeX();
+	lunch_abs_diff(matBlur1, matBlur2, threads, blocks);
 	matBlur2->toCpu();
 	matrixImage<uchar3> *matImg = matFloatToMatUchar3(matBlur2);
 	spdlog::info("Writing image");
