@@ -11,6 +11,7 @@ void cudaMemcpy2DX(void *dst, size_t dpitch, const void *src, size_t spitch,
 				   size_t width, size_t height, cudaMemcpyKind kind);
 void cudaFreeX(void *ptr);
 
+void cudaDeviceSynchronizeX();
 
 
 #endif //GPGPU_CUDAFUNCTIONS_CUH

@@ -66,3 +66,13 @@ void cudaFreeX(void *ptr)
 	}
 }
 
+void cudaDeviceSynchronizeX()
+{
+	cudaError_t err = cudaDeviceSynchronize();
+	if (err != cudaSuccess)
+	{
+		spdlog::error("Error synchronizing GPU: {}", cudaGetErrorString(err));
+		std::exit(1);
+	}
+}
+

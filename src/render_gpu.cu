@@ -80,13 +80,7 @@ void use_gpu(gil::rgb8_image_t &image)
 	spdlog::info("Lunching Grayscale");
 	grayscale<<<blocks, threads>>>(matImg->buffer, matImg->width,
 								   matImg->height, matImg->pitch);
-	cudaError_t err = cudaDeviceSynchronize();
-	if (err != cudaSuccess)
-	{
-		spdlog::error("Error in cudaDeviceSynchronize: {}",
-					  cudaGetErrorString(err));
-		std::exit(1);
-	}
+	cudaDeviceSynchronizeX();
 	spdlog::info("Lunching Gaussian Blur");
 	matrixImage<uchar3> *matOut = matImg->deepCopy();
 	for (int i = 0; i < 20; i++)
@@ -94,13 +88,7 @@ void use_gpu(gil::rgb8_image_t &image)
 		gaussianBlur<<<blocks, threads>>>(matImg->buffer, matOut->buffer,
 										  matImg->width, matImg->height,
 										  matImg->pitch);
-		cudaError_t err = cudaDeviceSynchronize();
-		if (err != cudaSuccess)
-		{
-			spdlog::error("Error in cudaDeviceSynchronize: {}",
-						  cudaGetErrorString(err));
-			std::exit(1);
-		}
+		cudaDeviceSynchronizeX();
 		matrixImage<uchar3> *tmp = matImg;
 		matImg = matOut;
 		matOut = tmp;
