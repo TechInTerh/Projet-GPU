@@ -9,7 +9,8 @@
 // row: the row coordinate of the value
 // pitch: the actual allocation size **in bytes** of a row plus its padding
 template<typename T>
-__device__ T *eltPtr(T *baseAddress, size_t col, size_t row, size_t pitch)
+__device__ __host__ T *
+eltPtr(T *baseAddress, size_t col, size_t row, size_t pitch)
 {
 	return (T *) ((char *) baseAddress + row * pitch +
 				  col * sizeof(T));  // FIXME
@@ -33,35 +34,64 @@ grayscale(uchar3 *matImg, float *matOut, size_t width, size_t height,
 }
 
 __global__ void
-gaussianBlur(float *matIn,float *matOut, size_t width, size_t height,
-			 size_t pitch)
+gaussianBlur(float *matIn, float *matOut, size_t width, size_t height,
+			 size_t pitch, size_t kernel_size, float *kernel,
+			 size_t kernel_pitch)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+	size_t offset = kernel_size / 2;
 	if (idx > width || idy > height)
 	{
 		return;
 	}
-	const size_t kernel_size = 3;
-	const float ker[kernel_size][kernel_size] = {{0.0625, 0.125, 0.0625},
-												 {0.125,  0.25,  0.125},
-												 {0.0625, 0.125, 0.0625}};
 	float val_out = 0;
 	for (size_t k_w = 0; k_w < kernel_size; k_w++)
 	{
 		for (size_t k_h = 0; k_h < kernel_size; k_h++)
 		{
-			if (idx + k_w-1 < width+1 && idy + k_h-1 < height+1)
+			if (idx + k_w - offset < width && idy + k_h - offset < height)
 			{
-				float *px_in = eltPtr<float>(matIn, idx + k_w - 1,
-											   idy + k_h - 1, pitch);
-				val_out += *px_in * ker[k_w][k_h];
+				float *px_in = eltPtr<float>(matIn, idx + k_w - offset,
+											 idy + k_h - offset, pitch);
+				val_out += *px_in * (*eltPtr(kernel, k_w, k_h, kernel_pitch));
 			}
 		}
 	}
 	float *px_out = eltPtr<float>(matOut, idx, idy, pitch);
 	*px_out = val_out;
 
+}
+
+matrixImage<float> *generateKernelGPU(size_t kernel_size)
+{
+	matrixImage<float> *kernel = new matrixImage<float>(kernel_size,
+														kernel_size);
+	float mean = kernel_size / 2;
+	float sigma = 1.0;
+	float sum = 0.0;
+	for (size_t y = 0; y < kernel_size; y++)
+	{
+		for (size_t x = 0; x < kernel_size; x++)
+		{
+			float val = std::exp(
+					-0.5 * (std::pow((x - mean) / sigma, 2.0) +
+							std::pow((y - mean) / sigma, 2.0))) /
+						(2 * M_PI * sigma * sigma);
+			kernel->buffer[y * kernel_size + x] = val;
+			sum += val;
+		}
+	}
+	for (size_t i = 0; i < kernel_size; i++)
+	{
+		for (size_t j = 0; j < kernel_size; j++)
+		{
+			kernel->buffer[i * kernel_size + j] /= sum;
+
+		}
+	}
+	kernel->toGpu();
+	return kernel;
 }
 
 void use_gpu(gil::rgb8_image_t &image)
@@ -79,18 +109,20 @@ void use_gpu(gil::rgb8_image_t &image)
 	matGray->toGpu();
 	grayscale<<<blocks, threads>>>(
 			matImg->buffer, matGray->buffer,
-			matImg->width,matImg->height, matImg->pitch);
+			matImg->width, matImg->height, matImg->pitch);
 	cudaDeviceSynchronizeX();
 	delete matImg;
 
 
 	spdlog::info("Lunching Gaussian Blur");
 	matrixImage<float> *matBlur = matGray->deepCopy();
-	for (int i = 0; i < 201; i++)
+	matrixImage<float> *kernel = generateKernelGPU(7);
+	for (int i = 0; i < 60; i++)
 	{
 		gaussianBlur<<<blocks, threads>>>(matGray->buffer, matBlur->buffer,
 										  matGray->width, matGray->height,
-										  matGray->pitch);
+										  matGray->pitch, kernel->width,
+										  kernel->buffer, kernel->pitch);
 		cudaDeviceSynchronizeX();
 		matrixImage<float> *tmp = matBlur;
 		matBlur = matGray;
@@ -105,4 +137,5 @@ void use_gpu(gil::rgb8_image_t &image)
 	delete matBlur;
 	delete matImg;
 	delete matGray;
+	delete kernel;
 }
