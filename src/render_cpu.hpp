@@ -8,7 +8,7 @@
 #include <boost/gil/extension/io/png.hpp>
 #include <vector_types.h>
 #include <spdlog/spdlog.h>
-#include "matrix_image/matrix_image.h"
+#include "matrix_image/matrix_image.cuh"
 
 
 #define ERROR_MARGIN 0.1f

@@ -1,5 +1,7 @@
 #include "matrix_image.h"
 
+#include "matrix_image.cuh"
+#include "cudaFunctions/cudaFunctions.cuh"
 void write_image(matrixImage<uchar3> *matImage, const char *filename)
 {
 	gil::rgb8c_view_t src = gil::interleaved_view(matImage->width,
@@ -37,4 +39,14 @@ matrixImage<uchar3> *toMatrixImage(gil::rgb8_image_t &image)
 		// use it[j] to access pixel[i][j]
 	}
 	return mat;
+}
+
+__device__ __host__
+uchar3 createUchar3(unsigned char r, unsigned char g, unsigned char b)
+{
+	uchar3 ret = uchar3();
+	ret.x = r;
+	ret.y = g;
+	ret.z = b;
+	return ret;
 }
