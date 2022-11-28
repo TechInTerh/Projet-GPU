@@ -25,7 +25,7 @@ struct matrixImage
 	__device__ __host__ //Avaible in both CPU and GPU.
 	T *at(size_t x, size_t y)
 	{
-		return &buffer[y * width + x];
+		return (T *) ((char *) buffer + y * pitch + x * sizeof(T));
 	}
 
 	__device__ __host__
