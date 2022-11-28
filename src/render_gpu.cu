@@ -94,15 +94,27 @@ matrixImage<float> *generateKernelGPU(size_t kernel_size)
 	return kernel;
 }
 
-void use_gpu(gil::rgb8_image_t &image)
+__global__ void
+abs_diff(float *matIn, float *matOut, size_t width, size_t height,
+		 size_t pitch)
+{
+	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+	if (idx > width || idy > height)
+	{
+		return;
+	}
+	float *px_in = eltPtr<float>(matIn, idx, idy, pitch);
+	float *px_out = eltPtr<float>(matOut, idx, idy, pitch);
+	*px_out = std::abs(*px_in - *px_out);
+}
+
+matrixImage<float> *
+grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks)
 {
 	matrixImage<uchar3> *matImg = toMatrixImage(image);
 	matImg->toGpu();
 
-
-	dim3 threads(32, 32);
-	dim3 blocks((matImg->width + threads.x - 1) / threads.x,
-				(matImg->height + threads.y - 1) / threads.y);
 	spdlog::info("Lunching Grayscale");
 	matrixImage<float> *matGray = new matrixImage<float>(matImg->width,
 														 matImg->height);
@@ -111,31 +123,53 @@ void use_gpu(gil::rgb8_image_t &image)
 			matImg->buffer, matGray->buffer,
 			matImg->width, matImg->height, matImg->pitch);
 	cudaDeviceSynchronizeX();
-	delete matImg;
-
 
 	spdlog::info("Lunching Gaussian Blur");
 	matrixImage<float> *matBlur = matGray->deepCopy();
 	matrixImage<float> *kernel = generateKernelGPU(7);
-	for (int i = 0; i < 60; i++)
+	for (int i = 0; i < numberBlur; i++)
 	{
 		gaussianBlur<<<blocks, threads>>>(matGray->buffer, matBlur->buffer,
 										  matGray->width, matGray->height,
 										  matGray->pitch, kernel->width,
 										  kernel->buffer, kernel->pitch);
 		cudaDeviceSynchronizeX();
-		matrixImage<float> *tmp = matBlur;
-		matBlur = matGray;
-		matGray = tmp;
+		if (i != numberBlur - 1)
+		{
+			matrixImage<float> *tmp = matGray;
+			matGray = matBlur;
+			matBlur = tmp;
+		}
 	}
 
-	spdlog::info("Copying on CPU");
-	matBlur->toCpu();
-	matImg = matFloatToMatUchar3(matBlur);
-	spdlog::info("Writing image");
-	write_image(matImg, "img.png");
-	delete matBlur;
 	delete matImg;
 	delete matGray;
 	delete kernel;
+	return matBlur;
+}
+
+
+void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
+{
+
+	dim3 threads(32, 32);
+	dim3 blocks((image.width() + threads.x - 1) / threads.x,
+				(image.height() + threads.y - 1) / threads.y);
+	matrixImage<float> *matBlur1 = grayBlur(image, 1,threads,blocks);
+	matrixImage<float> *matBlur2 = grayBlur(image2, 1,threads,blocks);
+	spdlog::info("Lunching abs diff");
+	abs_diff<<<blocks, threads>>>(matBlur1->buffer, matBlur2->buffer,
+								  matBlur1->width, matBlur1->height,
+								  matBlur1->pitch);
+	cudaDeviceSynchronizeX();
+	matBlur2->toCpu();
+	matrixImage<uchar3> *matImg = matFloatToMatUchar3(matBlur2);
+	spdlog::info("Writing image");
+	write_image(matImg,"img.png");
+
+	delete matBlur1;
+	delete matImg;
+	delete matBlur2;
+
+
 }
