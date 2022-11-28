@@ -53,7 +53,7 @@ gaussianBlur(uchar3 *matIn, uchar3 *matOut, size_t width, size_t height,
 	{
 		for (size_t k_h = 0; k_h < kernel_size; k_h++)
 		{
-			if (idx + k_w - 1 < width && idy + k_h - 1 < height)
+			if (idx + k_w  <= width && idy + k_h <= height)
 			{
 				uchar3 *px_in = eltPtr<uchar3>(matIn, idx + k_w - 1,
 											   idy + k_h - 1, pitch);
@@ -83,7 +83,7 @@ void use_gpu(gil::rgb8_image_t &image)
 	cudaDeviceSynchronizeX();
 	spdlog::info("Lunching Gaussian Blur");
 	matrixImage<uchar3> *matOut = matImg->deepCopy();
-	for (int i = 0; i < 20; i++)
+	for (int i = 0; i < 200; i++)
 	{
 		gaussianBlur<<<blocks, threads>>>(matImg->buffer, matOut->buffer,
 										  matImg->width, matImg->height,
@@ -96,7 +96,7 @@ void use_gpu(gil::rgb8_image_t &image)
 
 	matOut->toCpu();
 	spdlog::info("Copying on CPU");
-	write_image(matOut);
+	write_image(matOut,"img.png");
 	delete matImg;
 	delete matOut;
 }

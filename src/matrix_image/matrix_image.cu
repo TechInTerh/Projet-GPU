@@ -1,5 +1,3 @@
-#include "matrix_image.h"
-
 #include "matrix_image.cuh"
 #include "cudaFunctions/cudaFunctions.cuh"
 void write_image(matrixImage<uchar3> *matImage, const char *filename)
