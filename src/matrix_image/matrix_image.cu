@@ -57,9 +57,19 @@ matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn)
 		for (size_t h = 0; h < matIn->height; h++)
 		{
 			uchar3 val = uchar3();
-			val.x = ceil(*matIn->at(w,h));
-			val.y = val.x;
-			val.z = val.x;
+			float *valIn = matIn->at(w,h);
+			if (*valIn > 255)
+			{
+				val.x = 255;
+				val.y = 255;
+				val.z = 255;
+			}
+			else
+			{
+				val.x = ceil(*matIn->at(w,h));
+				val.y = val.x;
+				val.z = val.x;
+			}
 			matOut->set(w,h, val);
 		}
 	}
