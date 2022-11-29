@@ -5,14 +5,9 @@
 #include <vector_types.h>
 #include <algorithm>
 #include <math.h>
-#include <boost/gil/image.hpp>
 #include <boost/gil/typedefs.hpp>
-#include <boost/gil/image.hpp>
-#include <boost/gil/extension/io/png/read.hpp>
-#include <boost/gil/extension/io/png/write.hpp>
-#include <boost/gil/extension/io/png.hpp>
 
-	void
+void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
 {
 	spdlog::error("{} ({},file: {}, line: {})", msg, filename, fname, line);
@@ -20,23 +15,6 @@ _abortError(const char *msg, const char *filename, const char *fname, int line)
 }
 
 
-matrixImage<uchar3> * matFloatToMatUchar3(matrixImage<float> * matIn)
-{
-	spdlog::info("Converting to uchar3");
-	matrixImage<uchar3> *matOut = new matrixImage<uchar3>(matIn->width,matIn->height);
-	for (size_t w = 0; w < matIn->width; w++)
-	{
-		for (size_t h = 0; h < matIn->height; h++)
-		{
-			uchar3 val = uchar3();
-			val.x = ceil(*matIn->at(w,h));
-			val.y = val.x;
-			val.z = val.x;
-			matOut->set(w,h, val);
-		}
-	}
-	return matOut;
-}
 void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out)
 {
 	spdlog::info("To Grayscale");
@@ -62,8 +40,12 @@ float **generate_kernel(float **kernel, size_t ker_size)
 	float sum = 0;
 	for (size_t x = 0; x < ker_size; ++x)
 	{
-		for (size_t y = 0; y < ker_size; ++y) {
-			kernel[x][y] = std::exp( -0.5 * (std::pow((x-mean)/sigma, 2.0) + std::pow((y-mean)/sigma,2.0)) ) / (2 * M_PI * sigma * sigma);
+		for (size_t y = 0; y < ker_size; ++y)
+		{
+			kernel[x][y] = std::exp(-0.5 * (std::pow((x - mean) / sigma, 2.0) +
+											std::pow((y - mean) / sigma,
+													 2.0))) /
+						   (2 * M_PI * sigma * sigma);
 			// Accumulate the kernel values
 			sum += kernel[x][y];
 		}
@@ -123,10 +105,10 @@ void gaussianBlur(
 	size_t height = buf_in->height;
 	//FIXME add assert to check buf_in size == buf_out size
 	const size_t kernel_size = 7; //FIXME change kernel and kernel size to a
-				      //struct an define a kernel generator
-				      //function of its size
+	//struct an define a kernel generator
+	//function of its size
 	const size_t offset = kernel_size / 2;
-	float **kernel = new float*[kernel_size];
+	float **kernel = new float *[kernel_size];
 	for (size_t i = 0; i < kernel_size; i++)
 	{
 		kernel[i] = new float[kernel_size];
@@ -143,11 +125,11 @@ void gaussianBlur(
 
 
 float pxDilationErosion(matrixImage<float> *matImg,
-		const size_t w,
-		const size_t h,
-		const size_t se_w,
-		const size_t se_h,
-		const bool d_or_e)
+						const size_t w,
+						const size_t h,
+						const size_t se_w,
+						const size_t se_h,
+						const bool d_or_e)
 {
 	//FIXME maybe change the way the structuring element is used. Use square
 	// centered around current pixel instead of the current pixel being in a corner.
@@ -169,19 +151,22 @@ float pxDilationErosion(matrixImage<float> *matImg,
 		{
 			if (sh + h < off_h)
 				continue;
-			max_value = std::max(max_value, *(matImg->at(sw + w - off_w, sh + h - off_h)));
-			min_value = std::min(min_value, *(matImg->at(sw + w - off_w, sh + h - off_h)));
+			max_value = std::max(max_value,
+								 *(matImg->at(sw + w - off_w, sh + h - off_h)));
+			min_value = std::min(min_value,
+								 *(matImg->at(sw + w - off_w, sh + h - off_h)));
 		}
 	}
 	if (d_or_e)
 		return max_value;
 	return min_value;
 }
+
 void dilationErosion(matrixImage<float> *mat_in,
-		matrixImage<float> *mat_out,
-		const size_t se_w,
-		const size_t se_h,
-		const bool d_or_e)
+					 matrixImage<float> *mat_out,
+					 const size_t se_w,
+					 const size_t se_h,
+					 const bool d_or_e)
 {
 	/*
 	 * d_or_e== true => dilation, else erosion
@@ -200,13 +185,16 @@ void dilationErosion(matrixImage<float> *mat_in,
 
 //FIXME atm, only rectangle structuring elements with unique pixel center
 //	used. check if disks would be better.
-void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t se_w, size_t se_h)
+void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out,
+				  size_t se_w, size_t se_h)
 {
 	spdlog::info("Morphological Opening");
 	dilationErosion(mat_in, mat_out, se_w, se_h, false);
 	dilationErosion(mat_in, mat_out, se_w, se_h, true);
 }
-void morphClosing(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t se_w, size_t se_h)
+
+void morphClosing(matrixImage<float> *mat_in, matrixImage<float> *mat_out,
+				  size_t se_w, size_t se_h)
 {
 	spdlog::info("Morphological Closing");
 	dilationErosion(mat_in, mat_out, se_w, se_h, true);
@@ -214,31 +202,34 @@ void morphClosing(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_
 }
 
 
-
 //FIXME maybe try to change all operations so we just need an in matrix.
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
 	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
-	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,
+														  matImg1->height);
 	toGrayscale(matImg1, matGray1);
 
 	matrixImage<uchar3> *matGray1_out = matFloatToMatUchar3(matGray1);
 	write_image(matGray1_out, "grayscale_1.png");
 
 	matrixImage<uchar3> *matImg2 = toMatrixImage(image2);
-	matrixImage<float> *matGray2 = new matrixImage<float>(matImg2->width,matImg2->height);
+	matrixImage<float> *matGray2 = new matrixImage<float>(matImg2->width,
+														  matImg2->height);
 	toGrayscale(matImg2, matGray2);
 
 	matrixImage<uchar3> *matGray2_out = matFloatToMatUchar3(matGray2);
 	write_image(matGray2_out, "grayscale_2.png");
 
-	matrixImage<float> *matGBlur1 = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matGBlur1 = new matrixImage<float>(matImg1->width,
+														   matImg1->height);
 	gaussianBlur(matGray1, matGBlur1);
 
 	matrixImage<uchar3> *matGBlur1_out = matFloatToMatUchar3(matGBlur1);
 	write_image(matGBlur1_out, "gaussian_blur_1.png");
 
-	matrixImage<float> *matGBlur2 = new matrixImage<float>(matImg2->width,matImg2->height);
+	matrixImage<float> *matGBlur2 = new matrixImage<float>(matImg2->width,
+														   matImg2->height);
 	gaussianBlur(matGray2, matGBlur2);
 
 	matrixImage<uchar3> *matGBlur2_out = matFloatToMatUchar3(matGBlur2);
@@ -260,12 +251,14 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	   */
 
 
-	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,
+															matImg1->height);
 	morphOpening(matGBlur1, matOpening, 20, 20);
 	matrixImage<uchar3> *matOpening_out = matFloatToMatUchar3(matOpening);
 	write_image(matOpening_out, "opening.png");
 
-	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,
+															matImg1->height);
 	morphClosing(matOpening, matClosing, 50, 50);
 	matrixImage<uchar3> *matClosing_out = matFloatToMatUchar3(matClosing);
 	write_image(matClosing_out, "closing.png");
