@@ -7,7 +7,7 @@
 #include <math.h>
 #include <boost/gil/typedefs.hpp>
 
-void
+	void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
 {
 	spdlog::error("{} ({},file: {}, line: {})", msg, filename, fname, line);
@@ -43,9 +43,9 @@ float **generate_kernel(float **kernel, size_t ker_size)
 		for (size_t y = 0; y < ker_size; ++y)
 		{
 			kernel[x][y] = std::exp(-0.5 * (std::pow((x - mean) / sigma, 2.0) +
-											std::pow((y - mean) / sigma,
-													 2.0))) /
-						   (2 * M_PI * sigma * sigma);
+						std::pow((y - mean) / sigma,
+							2.0))) /
+				(2 * M_PI * sigma * sigma);
 			// Accumulate the kernel values
 			sum += kernel[x][y];
 		}
@@ -105,8 +105,8 @@ void gaussianBlur(
 	size_t height = buf_in->height;
 	//FIXME add assert to check buf_in size == buf_out size
 	const size_t kernel_size = 7; //FIXME change kernel and kernel size to a
-	//struct an define a kernel generator
-	//function of its size
+				      //struct an define a kernel generator
+				      //function of its size
 	const size_t offset = kernel_size / 2;
 	float **kernel = new float *[kernel_size];
 	for (size_t i = 0; i < kernel_size; i++)
@@ -125,11 +125,11 @@ void gaussianBlur(
 
 
 float pxDilationErosion(matrixImage<float> *matImg,
-						const size_t w,
-						const size_t h,
-						const size_t se_w,
-						const size_t se_h,
-						const bool d_or_e)
+		const size_t w,
+		const size_t h,
+		const size_t se_w,
+		const size_t se_h,
+		const bool d_or_e)
 {
 	//FIXME maybe change the way the structuring element is used. Use square
 	// centered around current pixel instead of the current pixel being in a corner.
@@ -152,9 +152,9 @@ float pxDilationErosion(matrixImage<float> *matImg,
 			if (sh + h < off_h)
 				continue;
 			max_value = std::max(max_value,
-								 *(matImg->at(sw + w - off_w, sh + h - off_h)));
+					*(matImg->at(sw + w - off_w, sh + h - off_h)));
 			min_value = std::min(min_value,
-								 *(matImg->at(sw + w - off_w, sh + h - off_h)));
+					*(matImg->at(sw + w - off_w, sh + h - off_h)));
 		}
 	}
 	if (d_or_e)
@@ -163,10 +163,10 @@ float pxDilationErosion(matrixImage<float> *matImg,
 }
 
 void dilationErosion(matrixImage<float> *mat_in,
-					 matrixImage<float> *mat_out,
-					 const size_t se_w,
-					 const size_t se_h,
-					 const bool d_or_e)
+		matrixImage<float> *mat_out,
+		const size_t se_w,
+		const size_t se_h,
+		const bool d_or_e)
 {
 	/*
 	 * d_or_e== true => dilation, else erosion
@@ -186,7 +186,7 @@ void dilationErosion(matrixImage<float> *mat_in,
 //FIXME atm, only rectangle structuring elements with unique pixel center
 //	used. check if disks would be better.
 void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out,
-				  size_t se_w, size_t se_h)
+		size_t se_w, size_t se_h)
 {
 	spdlog::info("Morphological Opening");
 	dilationErosion(mat_in, mat_out, se_w, se_h, false);
@@ -195,7 +195,7 @@ void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out,
 }
 
 void morphClosing(matrixImage<float> *mat_in, matrixImage<float> *mat_out,
-				  size_t se_w, size_t se_h)
+		size_t se_w, size_t se_h)
 {
 	spdlog::info("Morphological Closing");
 	dilationErosion(mat_in, mat_out, se_w, se_h, true);
@@ -254,7 +254,7 @@ void pxBernsenThreshold(matrixImage<float> *mat_in,
 	if (local_contrast < contrast_threshold)
 	{
 		if (local_midgray >= avg_intensity) //FIXME maybe get global mean of the
-					    //image instead of 128.f
+						    //image instead of 128.f
 			value = 255.f;
 	}
 	else if (*cur_px >= local_midgray)
@@ -270,7 +270,6 @@ void bernsenThreshold(matrixImage<float> *mat_in,
 {
 	spdlog::info("Thresholding the image");
 	float avg_intensity = getAvgIntensity(mat_in);
-	std::cout << "avg_intensity = " << avg_intensity << std::endl;
 	for (size_t w = 0; w < mat_in->width; w++)
 	{
 		for (size_t h = 0; h < mat_in->height; h++)
@@ -344,12 +343,92 @@ void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 	}
 }
 
+void get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
+{
+	spdlog::info("labeling connected components");
+	std::vector<int> labels;
+	int nxt_label = 1;
+	float inf = mat_in->width * mat_out->height;
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_in->height; h++)
+		{
+			if (*(mat_in->at(w, h)) == 0.f)
+			{
+				mat_out->set(w, h, inf);
+				if (*(mat_out->at(w, h)) == 0)
+					std::cout << "this is not normal" << std::endl;
+				continue;
+			}
+			float l, ul, u, ur;
+			l = ul = u = ur = inf;
+			std::cout << "setting to " << inf << std::endl;
+			if (w > 0)
+			{
+				l = *(mat_out->at(w - 1, h));
+				std::cout << "l is " << l << std::endl;
+				if (h > 0)
+				{
+					ul = *(mat_out->at(w - 1, h - 1));
+					std::cout << "ul is " << ul << std::endl;
+				}
+			}
+			if (h > 0)
+			{
+				u = *(mat_out->at(w, h - 1));
+				std::cout << "u is " << u << std::endl;
+				if (w + 1 < mat_out->height)
+				{
+					ur = *(mat_out->at(w + 1, h - 1));
+					std::cout << "ur is " << ur << std::endl;
+				}
+			}
+			std::cout << "reached here" <<std::endl;
+			int tmp = std::min(l, std::min(ul, std::min(u, ur)));
+			std::cout << "tmp = " << tmp <<std::endl;
+			if (tmp == inf)
+			{
+				std::cout << "in here with tmp = " << tmp << std::endl;
+				tmp = nxt_label;
+				nxt_label++;
+				labels.push_back(tmp);
+			}
+			else
+			{
+				mat_out->set(w, h, tmp);
+				std::cout << "in here with l = " << l << std::endl;
+				if (l < inf)
+				{
+					labels[l] = std::min(labels[l], tmp);
+				}
+				if (ul < inf)
+					labels[ul] = std::min(labels[ul], tmp);
+				if (u < inf)
+					labels[u] = std::min(labels[u], tmp);
+				if (ur < inf)
+					labels[ur] = std::min(labels[ur], tmp);
+			}
+		}
+	}
+
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_in->height; h++)
+		{
+			if (*(mat_in->at(w, h)) == 0.f)
+				continue;
+			float *cur_value = mat_out->at(w, h);
+			*cur_value = 255.f / labels[*cur_value];
+		}
+	}
+}
+
 //FIXME maybe try to change all operations so we just need an in matrix.
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
 	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
 	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,
-														  matImg1->height);
+			matImg1->height);
 	toGrayscale(matImg1, matGray1);
 
 	matrixImage<uchar3> *matGray1_out = matFloatToMatUchar3(matGray1);
@@ -357,21 +436,21 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 
 	matrixImage<uchar3> *matImg2 = toMatrixImage(image2);
 	matrixImage<float> *matGray2 = new matrixImage<float>(matImg2->width,
-														  matImg2->height);
+			matImg2->height);
 	toGrayscale(matImg2, matGray2);
 
 	matrixImage<uchar3> *matGray2_out = matFloatToMatUchar3(matGray2);
 	write_image(matGray2_out, "grayscale_2.png");
 
 	matrixImage<float> *matGBlur1 = new matrixImage<float>(matImg1->width,
-														   matImg1->height);
+			matImg1->height);
 	gaussianBlur(matGray1, matGBlur1);
 
 	matrixImage<uchar3> *matGBlur1_out = matFloatToMatUchar3(matGBlur1);
 	write_image(matGBlur1_out, "gaussian_blur_1.png");
 
 	matrixImage<float> *matGBlur2 = new matrixImage<float>(matImg2->width,
-														   matImg2->height);
+			matImg2->height);
 	gaussianBlur(matGray2, matGBlur2);
 
 	matrixImage<uchar3> *matGBlur2_out = matFloatToMatUchar3(matGBlur2);
@@ -405,6 +484,11 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	otsuThreshold(matOpening, matThreshold);
 	matrixImage<uchar3> *matOtsu_out = matFloatToMatUchar3(matThreshold);
 	write_image(matOtsu_out, "otsu.png");
+
+	matrixImage<float> *matLabels = new matrixImage<float>(matImg1->width,matImg1->height);
+	get_labels(matThreshold, matLabels);
+	matrixImage<uchar3> *matLabels_out = matFloatToMatUchar3(matThreshold);
+	write_image(matLabels_out, "labels.png");
 
 	delete matImg1;
 	delete matImg2;
