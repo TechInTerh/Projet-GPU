@@ -280,6 +280,71 @@ void bernsenThreshold(matrixImage<float> *mat_in,
 	}
 }
 
+void generate_histo(matrixImage<float> *mat_in, int *histo)
+{
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_in->height; h++)
+		{
+			float *tmp_px = mat_in->at(w, h);
+			int value = (int)(*tmp_px + 0.5);
+			histo[value] += 1;
+		}
+	}
+}
+
+int find_mean_intensity(int *histo, int nb_px)
+{
+	float sigmas[256] = {0.f};
+	for (int i = 1; i < 256; i++)
+	{
+		float wb, wf, mu_b, mu_f, count_b;
+		wb = wf = mu_b = mu_f = count_b = 0.f;
+		for (int  j = 0; j < i; j++)
+		{
+			count_b += histo[j];
+			mu_b += histo[j] * j;
+		}
+		wb = count_b / (float)nb_px;
+		wf = 1.f - wb;
+		mu_b /= count_b;
+		for (int j = i; j < 256; j++)
+		{
+			mu_f += histo[j] * j;
+		}
+		mu_f /= (nb_px - count_b);
+		sigmas[i] = wb * wf * std::pow(mu_b - mu_f, 2);
+	}
+	int max = 0;
+	for (int i = 0; i < 256; i++)
+	{
+		if (sigmas[i] > sigmas[max])
+			max = i;
+	}
+	return max;
+}
+
+void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
+{
+	spdlog::info("")
+	int histo[256] = {0};
+	generate_histo(mat_in, histo);
+	size_t width = mat_in->width;
+	size_t height = mat_in->height;
+	int mean_intensity = find_mean_intensity(histo, mat_in->width * mat_in->height);
+	for (size_t w = 0; w <width; w++)
+	{
+		for (size_t h = 0; h < height; h++)
+		{
+			if (*(mat_in->at(w, h)) >= mean_intensity)
+				mat_out->set(w, h, 255.f);
+			else
+				mat_out->set(w, h, 0.f);
+		}
+	}
+}
+
+
 //FIXME maybe try to change all operations so we just need an in matrix.
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
@@ -337,6 +402,11 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	bernsenThreshold(matThreshold, matThreshold2, 10, 10);
 	matrixImage<uchar3> *matThreshold2_out = matFloatToMatUchar3(matThreshold2);
 	write_image(matThreshold2_out, "threshold2.png");
+
+	otsuThreshold(matOpening, matThreshold);
+	matrixImage<uchar3> *matOtsu_out = matFloatToMatUchar3(matThreshold);
+	write_image(matOtsu_out, "otsu.png");
+
 
 	delete matImg1;
 	delete matImg2;
