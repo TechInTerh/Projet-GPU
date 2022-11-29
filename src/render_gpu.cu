@@ -3,6 +3,16 @@
 #include <iostream>
 #include "cuda_runtime_api.h"
 
+void write_image_float(matrixImage<float> *mat, std::string path)
+{
+	mat->toCpu();
+	matrixImage<uchar3> *tmp = matFloatToMatUchar3(mat);
+	write_image(tmp, path.c_str());
+	delete tmp;
+	mat->toGpu();
+
+}
+
 // Computes the pointer address of a given value in a 2D array given:
 // baseAddress: the base address of the buffer
 // col: the col coordinate of the value
@@ -29,13 +39,14 @@ grayscale(uchar3 *matImg, float *matOut, size_t width, size_t height,
 	}
 	uchar3 *px_in = eltPtr<uchar3>(matImg, idx, idy, pitch_in);
 	float val_out = 0.3 * px_in->x + 0.59 * px_in->y + 0.11 * px_in->z;
-	float *px_out = eltPtr<float>(matOut, idx, idy,  pitch_out);
+	float *px_out = eltPtr<float>(matOut, idx, idy, pitch_out);
 	*px_out = val_out;
 }
 
 __global__ void
 gaussianBlur(float *matIn, float *matOut, size_t width, size_t height,
-			 size_t pitch, size_t kernel_size, float *kernel,
+			 size_t pitch_in, size_t pitch_out, size_t kernel_size,
+			 float *kernel,
 			 size_t kernel_pitch)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -53,12 +64,12 @@ gaussianBlur(float *matIn, float *matOut, size_t width, size_t height,
 			if (idx + k_w - offset < width && idy + k_h - offset < height)
 			{
 				float *px_in = eltPtr<float>(matIn, idx + k_w - offset,
-											 idy + k_h - offset, pitch);
+											 idy + k_h - offset, pitch_in);
 				val_out += *px_in * (*eltPtr(kernel, k_w, k_h, kernel_pitch));
 			}
 		}
 	}
-	float *px_out = eltPtr<float>(matOut, idx, idy, pitch);
+	float *px_out = eltPtr<float>(matOut, idx, idy, pitch_out);
 	*px_out = val_out;
 
 }
@@ -110,7 +121,8 @@ abs_diff(float *matIn, float *matOut, size_t width, size_t height,
 }
 
 matrixImage<float> *
-grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks)
+grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks,
+		 const char *name)
 {
 	matrixImage<uchar3> *matImg = toMatrixImage(image);
 	matImg->toGpu();
@@ -121,8 +133,9 @@ grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks)
 	matGray->toGpu();
 	grayscale<<<blocks, threads>>>(
 			matImg->buffer, matGray->buffer,
-			matImg->width, matImg->height, matImg->pitch,matGray->pitch);
+			matImg->width, matImg->height, matImg->pitch, matGray->pitch);
 	cudaDeviceSynchronizeX();
+	write_image_float(matGray, name);
 
 	spdlog::info("Lunching Gaussian Blur");
 	matrixImage<float> *matBlur = matGray->deepCopy();
@@ -131,7 +144,8 @@ grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks)
 	{
 		gaussianBlur<<<blocks, threads>>>(matGray->buffer, matBlur->buffer,
 										  matGray->width, matGray->height,
-										  matGray->pitch, kernel->width,
+										  matGray->pitch, matBlur->pitch,
+										  kernel->width,
 										  kernel->buffer, kernel->pitch);
 		cudaDeviceSynchronizeX();
 		if (i != numberBlur - 1)
@@ -217,47 +231,53 @@ __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
 void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
 							   dim3 blocks)
 {
+	size_t size1_w = 0.01 * matIn->width;
+	size_t size1_h = 0.01 * matIn->height;
+	size_t size2_w = 0.02 * matIn->width;
+	size_t size2_h = 0.02 * matIn->height;
 	spdlog::info("Lunching morph opening");
 	matrixImage<float> *matOut = matIn->deepCopy();
 	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
 										   matIn->width, matIn->height,
-										   matIn->pitch, 20, 20, true);
+										   matIn->pitch, size1_w, size1_h, true);
 	cudaDeviceSynchronizeX();
 	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
 										   matIn->width, matIn->height,
-										   matIn->pitch, 20, 20, false);
+										   matIn->pitch, size1_w, size1_h, false);
 	cudaDeviceSynchronizeX();
+	write_image_float(matIn, "morph_opening.png");
 	spdlog::info("Lunching morph closing");
 	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
 										   matIn->width, matIn->height,
-										   matIn->pitch, 50, 50, false);
+										   matIn->pitch, size2_w, size2_h, false);
 
 	cudaDeviceSynchronizeX();
 	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
 										   matIn->width, matIn->height,
-										   matIn->pitch, 50, 50, true);
+										   matIn->pitch, size2_w, size2_h, true);
 	cudaDeviceSynchronizeX();
+	delete matOut;
 }
+
 
 void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 {
 	dim3 threads(32, 32);
 	dim3 blocks((image.width() + threads.x - 1) / threads.x,
 				(image.height() + threads.y - 1) / threads.y);
-	matrixImage<float> *matBlur1 = grayBlur(image, 1, threads, blocks);
-	matrixImage<float> *matBlur2 = grayBlur(image2, 1, threads, blocks);
-	matBlur2->toCpu();
-	matrixImage<uchar3> *tmp = matFloatToMatUchar3(matBlur2);
-	write_image(tmp, "blur1.png");
-	delete tmp;
-	matBlur2->toGpu();
+	matrixImage<float> *matBlur1 = grayBlur(image, 1, threads, blocks,
+											"gray1.png");
+	matrixImage<float> *matBlur2 = grayBlur(image2, 1, threads, blocks,
+											"gray2.png");
+	write_image_float(matBlur1, "gpu_blur1.png");
+	write_image_float(matBlur2, "gpu_blur2.png");
+
 	lunch_abs_diff(matBlur1, matBlur2, threads, blocks);
+	write_image_float(matBlur2, "gpu_abs_diff.png");
+
 	launchMorphOpeningClosing(matBlur2, threads, blocks);
-	matBlur2->toCpu();
-	matrixImage<uchar3> *matImg = matFloatToMatUchar3(matBlur2);
-	spdlog::info("Writing image");
-	write_image(matImg, "img.png");
+	write_image_float(matBlur2, "gpu_morph.png");
+
 	delete matBlur1;
-	delete matImg;
 	delete matBlur2;
 }
