@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector>
 #include <vector_types.h>
+#include <queue>
 #include <algorithm>
 #include <math.h>
 #include <boost/gil/typedefs.hpp>
@@ -343,84 +344,54 @@ void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 	}
 }
 
+void update_neighbor(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t w, size_t h, std::queue<size_t> &q, float cur_label)
+{
+	float *value = mat_in->at(w, h);
+	float *label = mat_out->at(w, h);
+	if (*value != 0.f && *label == 0.f)
+	{
+		*label = 255.f / cur_label;
+		q.push(h * mat_in->width + w);
+	}
+}
+
+void update_neighbors(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t w, size_t h, std::queue<size_t> &q, float cur_label)
+{
+	if (w > 0)
+		update_neighbor(mat_in, mat_out, w - 1, h, q, cur_label);
+	if (w + 1 <  mat_in->width)
+		update_neighbor(mat_in, mat_out, w + 1, h, q, cur_label);
+	if (h > 0)
+		update_neighbor(mat_in, mat_out, w, h - 1, q, cur_label);
+	if (h + 1 < mat_in->height)
+		update_neighbor(mat_in, mat_out, w, h + 1, q, cur_label);
+}
+
 void get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 {
 	spdlog::info("labeling connected components");
-	std::vector<int> labels;
-	int nxt_label = 1;
-	float inf = mat_in->width * mat_out->height;
+	float cur_label = 1.f;
+	std::queue<size_t> q;
 	for (size_t w = 0; w < mat_in->width; w++)
 	{
 		for (size_t h = 0; h < mat_in->height; h++)
 		{
-			if (*(mat_in->at(w, h)) == 0.f)
-			{
-				mat_out->set(w, h, inf);
-				if (*(mat_out->at(w, h)) == 0)
-					std::cout << "this is not normal" << std::endl;
+			if (*(mat_in->at(w, h)) == 0.f || *(mat_out->at(w, h)) != 0.f)
 				continue;
-			}
-			float l, ul, u, ur;
-			l = ul = u = ur = inf;
-			std::cout << "setting to " << inf << std::endl;
-			if (w > 0)
+			mat_out->set(w, h, 255.f / cur_label);
+			q.push(h * mat_in->width + w);
+			while (!q.empty())
 			{
-				l = *(mat_out->at(w - 1, h));
-				std::cout << "l is " << l << std::endl;
-				if (h > 0)
-				{
-					ul = *(mat_out->at(w - 1, h - 1));
-					std::cout << "ul is " << ul << std::endl;
-				}
+				size_t pos = q.front();
+				q.pop();
+				size_t cur_w = pos % mat_in->width;
+				size_t cur_h = pos / mat_in->width;
+				update_neighbors(mat_in, mat_out, cur_w, cur_h, q, cur_label);
 			}
-			if (h > 0)
-			{
-				u = *(mat_out->at(w, h - 1));
-				std::cout << "u is " << u << std::endl;
-				if (w + 1 < mat_out->height)
-				{
-					ur = *(mat_out->at(w + 1, h - 1));
-					std::cout << "ur is " << ur << std::endl;
-				}
-			}
-			std::cout << "reached here" <<std::endl;
-			int tmp = std::min(l, std::min(ul, std::min(u, ur)));
-			std::cout << "tmp = " << tmp <<std::endl;
-			if (tmp == inf)
-			{
-				std::cout << "in here with tmp = " << tmp << std::endl;
-				tmp = nxt_label;
-				nxt_label++;
-				labels.push_back(tmp);
-			}
-			else
-			{
-				mat_out->set(w, h, tmp);
-				std::cout << "in here with l = " << l << std::endl;
-				if (l < inf)
-				{
-					labels[l] = std::min(labels[l], tmp);
-				}
-				if (ul < inf)
-					labels[ul] = std::min(labels[ul], tmp);
-				if (u < inf)
-					labels[u] = std::min(labels[u], tmp);
-				if (ur < inf)
-					labels[ur] = std::min(labels[ur], tmp);
-			}
+			cur_label++;
 		}
 	}
-
-	for (size_t w = 0; w < mat_in->width; w++)
-	{
-		for (size_t h = 0; h < mat_in->height; h++)
-		{
-			if (*(mat_in->at(w, h)) == 0.f)
-				continue;
-			float *cur_value = mat_out->at(w, h);
-			*cur_value = 255.f / labels[*cur_value];
-		}
-	}
+	std::cout << "number of labels is " << cur_label - 1 << std::endl;
 }
 
 //FIXME maybe try to change all operations so we just need an in matrix.
@@ -486,8 +457,9 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	write_image(matOtsu_out, "otsu.png");
 
 	matrixImage<float> *matLabels = new matrixImage<float>(matImg1->width,matImg1->height);
+	matLabels->fill(0.f);
 	get_labels(matThreshold, matLabels);
-	matrixImage<uchar3> *matLabels_out = matFloatToMatUchar3(matThreshold);
+	matrixImage<uchar3> *matLabels_out = matFloatToMatUchar3(matLabels);
 	write_image(matLabels_out, "labels.png");
 
 	delete matImg1;

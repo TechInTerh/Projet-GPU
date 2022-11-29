@@ -102,6 +102,17 @@ struct matrixImage
 		mat2->buffer = tmp_buf;
 	}
 
+	void fill(T value)
+	{
+		for (size_t w = 0; w < this->width; w++)
+		{
+			for (size_t h = 0; h < this->height; h++)
+			{
+				this->set(w, h, value);
+			}
+		}
+	}
+
 	//destructor
 	~matrixImage()
 	{
