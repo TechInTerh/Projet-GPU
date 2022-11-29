@@ -145,7 +145,6 @@ grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks,
 			matImg->buffer, matGray->buffer,
 			matImg->width, matImg->height, matImg->pitch, matGray->pitch);
 	cudaDeviceSynchronizeX();
-	write_image_float(matGray, name);
 
 	spdlog::info("Lunching Gaussian Blur");
 	matrixImage<float> *matBlur = matGray->deepCopy();
@@ -308,15 +307,8 @@ void launchThreshold(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 	cudaMemcpyX(histo, gpu_histo, size_histo * sizeof(int),
 				cudaMemcpyDeviceToHost);
 
-	int sum = 0;
-	for (int i = 0; i < 256; i++)
-	{
-		sum += histo[i];
-	}
-	spdlog::info("Sum : {}", sum);
 	int mean = find_mean_intensity(histo, matIn->width * matIn->height);
 
-	spdlog::info("Mean intensity is {}", mean);
 	thresholding<<<blocks, threads>>>(matIn->buffer, matIn->width,
 									  matIn->height,
 									  matIn->pitch, mean);
@@ -401,7 +393,6 @@ void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
 										   size1_h,
 										   false);
 	cudaDeviceSynchronizeX();
-	write_image_float(matIn, "gpu_morph_closing.png");
 	spdlog::info("Lunching morph opening");
 	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
 										   matIn->width, matIn->height,
@@ -431,16 +422,10 @@ launchLabelisation(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 									  matIn->width, matIn->height,
 									  matIn->pitch, matOut->pitch,index);
 	cudaDeviceSynchronizeX();
-	matOut->toCpu();
-	matIn->toCpu();
-	matIn->toGpu();
-	matOut->toGpu();
-	write_image_float(matOut, "gpu_label_1.png");
 	int *isChanged_gpu = (int *) cudaMallocX(sizeof(int));
 	int isChanges = 1;
 	matrixImage<float> *matOut2 = matOut->deepCopy();
 	matrixImage<float> *ret = matOut;
-	int number_iter = 0;
 	while (isChanges >= 1)
 	{
 		isChanges = 0;
@@ -455,7 +440,6 @@ launchLabelisation(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 		cudaMemcpyX(&isChanges, isChanged_gpu, sizeof(int),
 					cudaMemcpyDeviceToHost);
 		ret = matOut2;
-		number_iter++;
 		if (isChanges)
 		{
 			isChanges = 0;
@@ -471,13 +455,9 @@ launchLabelisation(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 			cudaMemcpyX(&isChanges, isChanged_gpu, sizeof(int),
 						cudaMemcpyDeviceToHost);
 			ret = matOut;
-			number_iter++;
-			matOut2->toCpu();
-			matOut2->toGpu();
 		}
 	}
 
-	spdlog::info("Number of iteration : {}", number_iter);
 	cudaFreeX(isChanged_gpu);
 	return ret;
 }
@@ -497,38 +477,6 @@ multiply_value(float *matIn, size_t width, size_t height, size_t pitch_in,
 	*px_in *= value;
 }
 
-void test_label_neighbors()
-{
-	matrixImage<float> *matIn = new matrixImage<float>(4, 4);
-	matIn->set(0, 0, 255);
-	matIn->set(0, 1, 255);
-	matIn->set(0, 2, 0);
-	matIn->set(0, 3, 0);
-	matIn->set(1, 0, 0);
-	matIn->set(1, 1, 0);
-	matIn->set(1, 2, 0);
-	matIn->set(1, 3, 255);
-	matIn->set(2, 0, 0);
-	matIn->set(2, 1, 0);
-	matIn->set(2, 2, 255);
-	matIn->set(2, 3, 255);
-	matIn->set(3, 0, 0);
-	matIn->set(3, 1, 0);
-	matIn->set(3, 2, 255);
-	matIn->set(3, 3, 255);
-
-	matIn->toGpu();
-
-	dim3 threads(32, 32);
-	dim3 blocks((matIn->width + threads.x - 1) / threads.x,
-				(matIn->height + threads.y - 1) / threads.y);
-
-	matrixImage<float> *matOut = launchLabelisation(matIn, threads, blocks);
-	multiply_value<<<blocks,threads>>>(matOut->buffer,matOut->width,matOut->height,matOut->pitch,50);
-	write_image_float(matOut, "gpu_test_label.png");
-	delete matIn;
-	delete matOut;
-}
 
 void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 {
@@ -539,20 +487,14 @@ void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 											"gpu_gray1.png");
 	matrixImage<float> *matBlur2 = grayBlur(image2, 1, threads, blocks,
 											"gpu_gray2.png");
-	write_image_float(matBlur1, "gpu_blur1.png");
-	write_image_float(matBlur2, "gpu_blur2.png");
 
 	lunch_abs_diff(matBlur1, matBlur2, threads, blocks);
-	write_image_float(matBlur2, "gpu_abs_diff.png");
 
 	launchMorphOpeningClosing(matBlur2, threads, blocks);
-	write_image_float(matBlur2, "gpu_morph.png");
 
 	launchThreshold(matBlur2, threads, blocks);
-	write_image_float(matBlur2, "gpu_threshold.png");
 
 	matrixImage<float> *ret = launchLabelisation(matBlur2, threads, blocks);
-	write_image_float(ret, "gpu_label_2.png");
 	multiply_value<<<blocks, threads>>>(ret->buffer, ret->width, ret->height,
 										ret->pitch, 50);
 	cudaDeviceSynchronizeX();
@@ -560,5 +502,6 @@ void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 
 	delete matBlur1;
 	delete matBlur2;
+	delete ret;
 
 }
