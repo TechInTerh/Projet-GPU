@@ -129,8 +129,8 @@ def all_frame_rectangle(frames_folder, output_folder, json_path):
         image = cv2.imread(frame)
         if frame_img in data:
             for objects in data[frame_img]:
-                x = (objects[0], objects[2])
-                y = (objects[1], objects[3])
+                x = (objects[0], objects[1])
+                y = (objects[0] + objects[2], objects[1] + objects[3])
                 image = cv2.rectangle(image, x, y, (0, 255, 0), 2)
         out.write(image)
 
