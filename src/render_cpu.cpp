@@ -344,7 +344,6 @@ void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 	}
 }
 
-
 //FIXME maybe try to change all operations so we just need an in matrix.
 void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 {
@@ -406,7 +405,6 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	otsuThreshold(matOpening, matThreshold);
 	matrixImage<uchar3> *matOtsu_out = matFloatToMatUchar3(matThreshold);
 	write_image(matOtsu_out, "otsu.png");
-
 
 	delete matImg1;
 	delete matImg2;
