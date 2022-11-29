@@ -338,16 +338,10 @@ void launchThreshold(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
 							   dim3 blocks)
 {
-	/*
 	size_t size1_w = 0.02 * matIn->width;
 	size_t size1_h = 0.02 * matIn->height;
 	size_t size2_w = 0.05 * matIn->width;
 	size_t size2_h = 0.05 * matIn->height;
-	*/
-	size_t size1_w = 20;
-	size_t size1_h = 20;
-	size_t size2_w = 20;
-	size_t size2_h = 20;
 
 	spdlog::info("Lunching morph closing");
 	matrixImage<float> *matOut = matIn->deepCopy();
