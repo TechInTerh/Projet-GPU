@@ -18,7 +18,7 @@ eltPtr(T *baseAddress, size_t col, size_t row, size_t pitch)
 
 __global__ void
 grayscale(uchar3 *matImg, float *matOut, size_t width, size_t height,
-		  size_t pitch)
+		  size_t pitch_in, size_t pitch_out)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -27,9 +27,9 @@ grayscale(uchar3 *matImg, float *matOut, size_t width, size_t height,
 	{
 		return;
 	}
-	uchar3 *px_in = eltPtr<uchar3>(matImg, idx, idy, pitch);
+	uchar3 *px_in = eltPtr<uchar3>(matImg, idx, idy, pitch_in);
 	float val_out = 0.3 * px_in->x + 0.59 * px_in->y + 0.11 * px_in->z;
-	float *px_out = eltPtr<float>(matOut, idx, idy, width * sizeof(float));
+	float *px_out = eltPtr<float>(matOut, idx, idy,  pitch_out);
 	*px_out = val_out;
 }
 
@@ -121,7 +121,7 @@ grayBlur(gil::rgb8_image_t &image, size_t numberBlur, dim3 threads, dim3 blocks)
 	matGray->toGpu();
 	grayscale<<<blocks, threads>>>(
 			matImg->buffer, matGray->buffer,
-			matImg->width, matImg->height, matImg->pitch);
+			matImg->width, matImg->height, matImg->pitch,matGray->pitch);
 	cudaDeviceSynchronizeX();
 
 	spdlog::info("Lunching Gaussian Blur");
@@ -246,6 +246,11 @@ void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 				(image.height() + threads.y - 1) / threads.y);
 	matrixImage<float> *matBlur1 = grayBlur(image, 1, threads, blocks);
 	matrixImage<float> *matBlur2 = grayBlur(image2, 1, threads, blocks);
+	matBlur2->toCpu();
+	matrixImage<uchar3> *tmp = matFloatToMatUchar3(matBlur2);
+	write_image(tmp, "blur1.png");
+	delete tmp;
+	matBlur2->toGpu();
 	lunch_abs_diff(matBlur1, matBlur2, threads, blocks);
 	launchMorphOpeningClosing(matBlur2, threads, blocks);
 	matBlur2->toCpu();
