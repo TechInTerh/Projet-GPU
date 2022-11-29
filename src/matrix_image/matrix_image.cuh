@@ -90,6 +90,18 @@ struct matrixImage
 		return newMat;
 	}
 
+	void swap(matrixImage<T> *mat2)
+	{
+		if (this->height != mat2->height || this->width != mat2->width)
+		{
+			spdlog::error("swapping matrices requires two matrices of same size");
+			std::exit(1);
+		}
+		T *tmp_buf = this->buffer;
+		this->buffer = mat2->buffer;
+		mat2->buffer = tmp_buf;
+	}
+
 	//destructor
 	~matrixImage()
 	{

@@ -161,11 +161,11 @@ float pxDilationErosion(matrixImage<float> *matImg,
 	float min_value = 256.f;
 	size_t off_w = se_w / 2;
 	size_t off_h = se_h / 2;
-	for (size_t sw = 0; sw + w - off_w < matImg->width && sw < se_w; sw++)
+	for (size_t sw = 0; sw + w < matImg->width + off_w && sw < se_w; sw++)
 	{
 		if (sw + w < off_w)
 			continue;
-		for (size_t sh = 0; sh + h - off_h < matImg->height && sh < se_h; sh++)
+		for (size_t sh = 0; sh + h < matImg->height + off_h && sh < se_h; sh++)
 		{
 			if (sh + h < off_h)
 				continue;
@@ -204,15 +204,93 @@ void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_
 {
 	spdlog::info("Morphological Opening");
 	dilationErosion(mat_in, mat_out, se_w, se_h, false);
+	mat_in->swap(mat_out);
 	dilationErosion(mat_in, mat_out, se_w, se_h, true);
 }
 void morphClosing(matrixImage<float> *mat_in, matrixImage<float> *mat_out, size_t se_w, size_t se_h)
 {
 	spdlog::info("Morphological Closing");
 	dilationErosion(mat_in, mat_out, se_w, se_h, true);
+	mat_in->swap(mat_out);
 	dilationErosion(mat_in, mat_out, se_w, se_h, false);
 }
 
+float getAvgIntensity(matrixImage<float> *mat_in)
+{
+	float avg_intensity = 0.f;
+	float nb_iter = 0.f;
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_in->height; h++)
+		{
+			float tmp_px = *(mat_in->at(w, h));
+			avg_intensity = avg_intensity * (nb_iter / (nb_iter + 1)) + tmp_px / (nb_iter + 1);
+			nb_iter++;
+		}
+	}
+	return avg_intensity;
+}
+
+void pxBernsenThreshold(matrixImage<float> *mat_in,
+		matrixImage<float> *mat_out,
+		size_t se_w,
+		size_t se_h,
+		float contrast_threshold,
+		size_t w,
+		size_t h,
+		size_t off_w,
+		size_t off_h,
+		float avg_intensity)
+{
+	float local_contrast;
+	float local_midgray = 0.f;
+	float value = 0.f; // 0 means it is background, 255 means foreground
+	float max_intensity = 0.f;
+	float min_intensity = 256.f;
+	for (size_t sw = 0; sw < se_w && sw + w < mat_in->width + off_w; sw++)
+	{
+		if (sw + w < off_w)
+			continue;
+		for (size_t sh = 0; sh < se_h && sh + h < mat_in->height + off_w; sh++)
+		{
+			if (sh + h < off_h)
+				continue;
+			float tmp_px = *(mat_in->at(sw + w - off_w, sh + h - off_h));
+			min_intensity = std::min(min_intensity, tmp_px);
+			max_intensity = std::max(max_intensity, tmp_px);
+		}
+	}
+	local_contrast = max_intensity - min_intensity;
+	local_midgray = (max_intensity + min_intensity) / 2;
+	float *cur_px = mat_in->at(w, h);
+	if (local_contrast < contrast_threshold)
+	{
+		if (local_midgray >= avg_intensity) //FIXME maybe get global mean of the
+					    //image instead of 128.f
+			value = 255.f;
+	}
+	else if (*cur_px >= local_midgray)
+		value = 255.f;
+	mat_out->set(w, h, value);
+}
+
+void bernsenThreshold(matrixImage<float> *mat_in,
+		matrixImage<float> *mat_out,
+		size_t se_w,
+		size_t se_h,
+		float contrast_threshold = 15.f)
+{
+	spdlog::info("Thresholding the image");
+	float avg_intensity = getAvgIntensity(mat_in);
+	std::cout << "avg_intensity = " << avg_intensity << std::endl;
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_in->height; h++)
+		{
+			pxBernsenThreshold(mat_in, mat_out, se_w, se_h, contrast_threshold, w, h, se_w / 2, se_h / 2, avg_intensity);
+		}
+	}
+}
 
 
 //FIXME maybe try to change all operations so we just need an in matrix.
@@ -247,32 +325,27 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	matGBlur1->abs_diff(matGBlur2);
 	matrixImage<uchar3> *matGBlur1_2_diff_out = matFloatToMatUchar3(matGBlur1);
 	write_image(matGBlur1_2_diff_out, "img_abs_diff.png");
-	/*
-	   matrixImage<float> *matGigaBlur_tmp = new matrixImage<float>(matImg1->width,matImg1->height);
-	   matrixImage<float> *matGigaBlur1 = new matrixImage<float>(matImg1->width,matImg1->height);
-	   matGigaBlur_tmp->copy(matGBlur1);
-	   int repeatBlur = 5;
-	   for (int i = 0; i < repeatBlur; i++)
-	   {
-	   gaussianBlur(matGigaBlur_tmp, matGigaBlur1);
-	   matGigaBlur_tmp->copy(matGigaBlur1);
-	   }
-	   */
 
+
+	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,matImg1->height);
+	morphClosing(matGBlur1, matClosing, 20, 20);
+	matrixImage<uchar3> *matClosing_out = matFloatToMatUchar3(matClosing);
+	write_image(matClosing_out, "closing.png");
 
 	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,matImg1->height);
-	morphOpening(matGBlur1, matOpening, 20, 20);
+	morphOpening(matClosing, matOpening, 20, 20);
 	matrixImage<uchar3> *matOpening_out = matFloatToMatUchar3(matOpening);
 	write_image(matOpening_out, "opening.png");
 
-	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,matImg1->height);
-	morphClosing(matOpening, matClosing, 50, 50);
-	matrixImage<uchar3> *matClosing_out = matFloatToMatUchar3(matClosing);
-	write_image(matClosing_out, "closing.png");
-	/*
-	   matrixImage<uchar3> *matGigaBlur_out = matFloatToMatUchar3(matGigaBlur1);
-	   write_image(matGigaBlur_out, "giga_blur.png");
-	   */
+	matrixImage<float> *matThreshold = new matrixImage<float>(matImg1->width,matImg1->height);
+	bernsenThreshold(matOpening, matThreshold, 10, 10);
+	matrixImage<uchar3> *matThreshold_out = matFloatToMatUchar3(matThreshold);
+	write_image(matThreshold_out, "threshold.png");
+
+	matrixImage<float> *matThreshold2 = new matrixImage<float>(matImg1->width,matImg1->height);
+	bernsenThreshold(matThreshold, matThreshold2, 10, 10);
+	matrixImage<uchar3> *matThreshold2_out = matFloatToMatUchar3(matThreshold2);
+	write_image(matThreshold2_out, "threshold2.png");
 
 	delete matImg1;
 	delete matImg2;
@@ -284,13 +357,10 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	delete matGBlur2;
 	delete matGBlur1_out;
 	delete matGBlur2_out;
-	/*
-	   delete matGigaBlur_tmp;
-	   delete matGigaBlur1;
-	   delete matGigaBlur_out;
-	   */
 	delete matOpening;
 	delete matOpening_out;
 	delete matClosing;
 	delete matClosing_out;
+	delete matThreshold;
+	delete matThreshold_out;
 }
