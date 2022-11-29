@@ -76,3 +76,12 @@ void cudaDeviceSynchronizeX()
 	}
 }
 
+void cudaMemcpyX(void *dst, const void *src, size_t count, cudaMemcpyKind kind)
+{
+	cudaError_t err = cudaMemcpy(dst, src, count, kind);
+	if (err != cudaSuccess)
+	{
+		spdlog::error("Error copying memory in {}: {}", cudaMemcpyKindToStr(kind), cudaGetErrorString(err));
+		std::exit(1);
+	}
+}

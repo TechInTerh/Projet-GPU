@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <math.h>
 #include <boost/gil/typedefs.hpp>
+#include <cmath>
 
 void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
@@ -77,11 +78,18 @@ void pxGaussianBlur(
 	{
 		for (size_t k_h = 0; k_h < ker_size; k_h++)
 		{
-			float *px_tmp = buf_in->at(x + k_w - offset, y + k_w - offset);
+			if (x + k_w - offset >= buf_in->width ||
+				y + k_h - offset >= buf_in->height)
+			{
+				continue;
+			}
+			float *px_tmp = buf_in->at(x + k_w - offset, y + k_h - offset);
 			float k_elt = ker[k_h][k_w];
 			px += *px_tmp * k_elt;
 		}
 	}
+	if (px > 255)
+		px = 255;
 	buf_out->set(x, y, px);
 }
 
@@ -114,9 +122,9 @@ void gaussianBlur(
 		kernel[i] = new float[kernel_size];
 	}
 	kernel = generate_kernel(kernel, kernel_size);
-	for (size_t w = offset; w < (width - offset); w++)
+	for (size_t h = 0; h < height; h++)
 	{
-		for (size_t h = offset; h < (height - offset); h++)
+		for (size_t w = 0; w < width; w++)
 		{
 			pxGaussianBlur(buf_in, buf_out, w, h, kernel, kernel_size, offset);
 		}
@@ -212,7 +220,8 @@ float getAvgIntensity(matrixImage<float> *mat_in)
 		for (size_t h = 0; h < mat_in->height; h++)
 		{
 			float tmp_px = *(mat_in->at(w, h));
-			avg_intensity = avg_intensity * (nb_iter / (nb_iter + 1)) + tmp_px / (nb_iter + 1);
+			avg_intensity = avg_intensity * (nb_iter / (nb_iter + 1)) +
+							tmp_px / (nb_iter + 1);
 			nb_iter++;
 		}
 	}
@@ -220,15 +229,15 @@ float getAvgIntensity(matrixImage<float> *mat_in)
 }
 
 void pxBernsenThreshold(matrixImage<float> *mat_in,
-		matrixImage<float> *mat_out,
-		size_t se_w,
-		size_t se_h,
-		float contrast_threshold,
-		size_t w,
-		size_t h,
-		size_t off_w,
-		size_t off_h,
-		float avg_intensity)
+						matrixImage<float> *mat_out,
+						size_t se_w,
+						size_t se_h,
+						float contrast_threshold,
+						size_t w,
+						size_t h,
+						size_t off_w,
+						size_t off_h,
+						float avg_intensity)
 {
 	float local_contrast;
 	float local_midgray = 0.f;
@@ -254,7 +263,7 @@ void pxBernsenThreshold(matrixImage<float> *mat_in,
 	if (local_contrast < contrast_threshold)
 	{
 		if (local_midgray >= avg_intensity) //FIXME maybe get global mean of the
-					    //image instead of 128.f
+			//image instead of 128.f
 			value = 255.f;
 	}
 	else if (*cur_px >= local_midgray)
@@ -263,10 +272,10 @@ void pxBernsenThreshold(matrixImage<float> *mat_in,
 }
 
 void bernsenThreshold(matrixImage<float> *mat_in,
-		matrixImage<float> *mat_out,
-		size_t se_w,
-		size_t se_h,
-		float contrast_threshold = 15.f)
+					  matrixImage<float> *mat_out,
+					  size_t se_w,
+					  size_t se_h,
+					  float contrast_threshold = 15.f)
 {
 	spdlog::info("Thresholding the image");
 	float avg_intensity = getAvgIntensity(mat_in);
@@ -275,7 +284,8 @@ void bernsenThreshold(matrixImage<float> *mat_in,
 	{
 		for (size_t h = 0; h < mat_in->height; h++)
 		{
-			pxBernsenThreshold(mat_in, mat_out, se_w, se_h, contrast_threshold, w, h, se_w / 2, se_h / 2, avg_intensity);
+			pxBernsenThreshold(mat_in, mat_out, se_w, se_h, contrast_threshold,
+							   w, h, se_w / 2, se_h / 2, avg_intensity);
 		}
 	}
 }
@@ -287,7 +297,7 @@ void generate_histo(matrixImage<float> *mat_in, int *histo)
 		for (size_t h = 0; h < mat_in->height; h++)
 		{
 			float *tmp_px = mat_in->at(w, h);
-			int value = (int)(*tmp_px + 0.5);
+			int value = (int) (*tmp_px + 0.5);
 			histo[value] += 1;
 		}
 	}
@@ -300,12 +310,12 @@ int find_mean_intensity(int *histo, int nb_px)
 	{
 		float wb, wf, mu_b, mu_f, count_b;
 		wb = wf = mu_b = mu_f = count_b = 0.f;
-		for (int  j = 0; j < i; j++)
+		for (int j = 0; j < i; j++)
 		{
 			count_b += histo[j];
 			mu_b += histo[j] * j;
 		}
-		wb = count_b / (float)nb_px;
+		wb = count_b / (float) nb_px;
 		wf = 1.f - wb;
 		mu_b /= count_b;
 		for (int j = i; j < 256; j++)
@@ -331,8 +341,9 @@ void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 	generate_histo(mat_in, histo);
 	size_t width = mat_in->width;
 	size_t height = mat_in->height;
-	int mean_intensity = find_mean_intensity(histo, mat_in->width * mat_in->height);
-	for (size_t w = 0; w <width; w++)
+	int mean_intensity = find_mean_intensity(histo,
+											 mat_in->width * mat_in->height);
+	for (size_t w = 0; w < width; w++)
 	{
 		for (size_t h = 0; h < height; h++)
 		{
@@ -382,22 +393,26 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 	write_image(matGBlur1_2_diff_out, "img_abs_diff.png");
 
 
-	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,
+															matImg1->height);
 	morphClosing(matGBlur1, matClosing, 20, 20);
 	matrixImage<uchar3> *matClosing_out = matFloatToMatUchar3(matClosing);
 	write_image(matClosing_out, "closing.png");
 
-	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,
+															matImg1->height);
 	morphOpening(matClosing, matOpening, 20, 20);
 	matrixImage<uchar3> *matOpening_out = matFloatToMatUchar3(matOpening);
 	write_image(matOpening_out, "opening.png");
 
-	matrixImage<float> *matThreshold = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matThreshold = new matrixImage<float>(matImg1->width,
+															  matImg1->height);
 	bernsenThreshold(matOpening, matThreshold, 10, 10);
 	matrixImage<uchar3> *matThreshold_out = matFloatToMatUchar3(matThreshold);
 	write_image(matThreshold_out, "threshold.png");
 
-	matrixImage<float> *matThreshold2 = new matrixImage<float>(matImg1->width,matImg1->height);
+	matrixImage<float> *matThreshold2 = new matrixImage<float>(matImg1->width,
+															   matImg1->height);
 	bernsenThreshold(matThreshold, matThreshold2, 10, 10);
 	matrixImage<uchar3> *matThreshold2_out = matFloatToMatUchar3(matThreshold2);
 	write_image(matThreshold2_out, "threshold2.png");

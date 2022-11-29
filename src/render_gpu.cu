@@ -13,6 +13,16 @@ void write_image_float(matrixImage<float> *mat, std::string path)
 
 }
 
+__device__ float my_max(float a, float b)
+{
+	return a > b ? a : b;
+}
+
+__device__ float my_min(float a, float b)
+{
+	return a < b ? a : b;
+}
+
 // Computes the pointer address of a given value in a 2D array given:
 // baseAddress: the base address of the buffer
 // col: the col coordinate of the value
@@ -70,7 +80,7 @@ gaussianBlur(float *matIn, float *matOut, size_t width, size_t height,
 		}
 	}
 	float *px_out = eltPtr<float>(matOut, idx, idy, pitch_out);
-	*px_out = val_out;
+	*px_out = my_min(val_out,255.f);
 
 }
 
@@ -179,18 +189,9 @@ void lunch_abs_diff(matrixImage<float> *matBlur1, matrixImage<float> *matBlur2,
 	cudaDeviceSynchronizeX();
 }
 
-__device__ float my_max(float a, float b)
-{
-	return a > b ? a : b;
-}
-
-__device__ float my_min(float a, float b)
-{
-	return a < b ? a : b;
-}
 
 __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
-								  size_t height, size_t pitch, size_t se_w,
+								  size_t height, size_t pitch_in,size_t pitch_out, size_t se_w,
 								  size_t se_h, bool d_or_e)
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -210,7 +211,7 @@ __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
 			if (idx + sw - off_w < width && idy + sh - off_h < height)
 			{
 				float *px_in = eltPtr<float>(matIn, idx + sw - off_w,
-											 idy + sh - off_h, pitch);
+											 idy + sh - off_h, pitch_in);
 				if (d_or_e)
 					max_value = my_max(max_value, *px_in);
 
@@ -220,7 +221,7 @@ __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
 			}
 		}
 	}
-	float *px_out = eltPtr<float>(matOut, idx, idy, pitch);
+	float *px_out = eltPtr<float>(matOut, idx, idy, pitch_out);
 	if (d_or_e)
 		*px_out = max_value;
 	else
@@ -228,47 +229,146 @@ __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
 }
 
 
-void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
-							   dim3 blocks)
+__global__ void generate_histogram(float *matIn, size_t width, size_t height,
+								   size_t pitch, int *histogram,
+								   size_t hist_size)
 {
-	size_t size1_w = 0.01 * matIn->width;
-	size_t size1_h = 0.01 * matIn->height;
-	size_t size2_w = 0.02 * matIn->width;
-	size_t size2_h = 0.02 * matIn->height;
-	spdlog::info("Lunching morph opening");
-	matrixImage<float> *matOut = matIn->deepCopy();
-	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
-										   matIn->width, matIn->height,
-										   matIn->pitch, size1_w, size1_h, true);
-	cudaDeviceSynchronizeX();
-	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
-										   matIn->width, matIn->height,
-										   matIn->pitch, size1_w, size1_h, false);
-	cudaDeviceSynchronizeX();
-	write_image_float(matIn, "morph_opening.png");
-	spdlog::info("Lunching morph closing");
-	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
-										   matIn->width, matIn->height,
-										   matIn->pitch, size2_w, size2_h, false);
+	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+	if (idx > width || idy > height)
+	{
+		return;
+	}
+	float *px_in = eltPtr<float>(matIn, idx, idy, pitch);
+	int value = (int)(*px_in + 0.5);
+	if (value < hist_size)
+	{
+		atomicAdd(&histogram[value], 1);
+	}
+}
 
+int find_mean_intensity(int *histo, size_t nb_px)
+{
+	float sigmas[256] = {0.f};
+	for (int i = 1; i < 256; i++)
+	{
+		float wb, wf, mu_b, mu_f, count_b;
+		wb = wf = mu_b = mu_f = count_b = 0.f;
+		for (int  j = 0; j < i; j++)
+		{
+			count_b += histo[j];
+			mu_b += histo[j] * j;
+		}
+		wb = count_b / (float)nb_px;
+		wf = 1.f - wb;
+		mu_b /= count_b;
+		for (int j = i; j < 256; j++)
+		{
+			mu_f += histo[j] * j;
+		}
+		mu_f /= (nb_px - count_b);
+		sigmas[i] = wb * wf * std::pow(mu_b - mu_f, 2);
+	}
+	int max = 0;
+	for (int i = 0; i < 256; i++)
+	{
+		if (sigmas[i] > sigmas[max])
+			max = i;
+	}
+	return max;
+}
+
+__global__ void thresholding(float *matIn, size_t width, size_t height,
+							 size_t pitch, int threshold)
+{
+	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
+	if (idx > width || idy > height)
+	{
+		return;
+	}
+	float *px_in = eltPtr<float>(matIn, idx, idy, pitch);
+	if (*px_in >= threshold)
+		*px_in = 255.f;
+	else
+		*px_in = 0.f;
+}
+
+void launchThreshold(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
+{
+	spdlog::info("Lunching threshold");
+	size_t size_histo = 256;
+	int *histo = (int *) calloc(size_histo ,sizeof (int));
+	int *gpu_histo = (int *) cudaMallocX(size_histo * sizeof(int));
+	cudaMemcpyX(gpu_histo, histo, size_histo * sizeof(int), cudaMemcpyHostToDevice);
+
+	generate_histogram<<<blocks, threads>>>(matIn->buffer, matIn->width,
+											matIn->height, matIn->pitch, gpu_histo,
+											size_histo);
 	cudaDeviceSynchronizeX();
-	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
-										   matIn->width, matIn->height,
-										   matIn->pitch, size2_w, size2_h, true);
+	cudaMemcpyX(histo, gpu_histo, size_histo * sizeof(int),
+			   cudaMemcpyDeviceToHost);
+	int mean = find_mean_intensity(histo, matIn->width * matIn->height);
+	spdlog::info("Mean intensity is {}", mean);
+	thresholding<<<blocks,threads>>>(matIn->buffer, matIn->width, matIn->height,
+									 matIn->pitch, mean);
 	cudaDeviceSynchronizeX();
-	delete matOut;
+	free(histo);
+	cudaFreeX(gpu_histo);
 }
 
 
+
+void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
+							   dim3 blocks)
+{
+	/*
+	size_t size1_w = 0.02 * matIn->width;
+	size_t size1_h = 0.02 * matIn->height;
+	size_t size2_w = 0.05 * matIn->width;
+	size_t size2_h = 0.05 * matIn->height;
+	*/
+	size_t size1_w = 20;
+	size_t size1_h = 20;
+	size_t size2_w = 20;
+	size_t size2_h = 20;
+
+	spdlog::info("Lunching morph closing");
+	matrixImage<float> *matOut = matIn->deepCopy();
+	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch,matOut->pitch, size1_w, size1_h,
+										   true);
+	cudaDeviceSynchronizeX();
+	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch,matOut->pitch, size1_w, size1_h,
+										   false);
+	cudaDeviceSynchronizeX();
+	write_image_float(matIn, "gpu_morph_closing.png");
+	spdlog::info("Lunching morph opening");
+	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch,matOut->pitch, size2_w, size2_h,
+										   false);
+
+	cudaDeviceSynchronizeX();
+	dilatationErosion<<<blocks, threads>>>(matOut->buffer, matIn->buffer,
+										   matIn->width, matIn->height,
+										   matIn->pitch,matOut->pitch, size2_w, size2_h,
+										   true);
+	cudaDeviceSynchronizeX();
+	delete matOut;
+}
 void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 {
 	dim3 threads(32, 32);
 	dim3 blocks((image.width() + threads.x - 1) / threads.x,
 				(image.height() + threads.y - 1) / threads.y);
 	matrixImage<float> *matBlur1 = grayBlur(image, 1, threads, blocks,
-											"gray1.png");
+											"gpu_gray1.png");
 	matrixImage<float> *matBlur2 = grayBlur(image2, 1, threads, blocks,
-											"gray2.png");
+											"gpu_gray2.png");
 	write_image_float(matBlur1, "gpu_blur1.png");
 	write_image_float(matBlur2, "gpu_blur2.png");
 
@@ -278,6 +378,8 @@ void use_gpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 	launchMorphOpeningClosing(matBlur2, threads, blocks);
 	write_image_float(matBlur2, "gpu_morph.png");
 
+	launchThreshold(matBlur2, threads, blocks);
+	write_image_float(matBlur2, "gpu_threshold.png");
 	delete matBlur1;
 	delete matBlur2;
 }
