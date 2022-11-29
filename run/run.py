@@ -1,33 +1,17 @@
 import cv2
+import glob
 import os
 import sys
+import json
 import shutil
+from frame_utils import *
 
-if len(sys.argv) != 3:
-    print("Usage: python run.py <path_to_vid> <folder>")
+if len(sys.argv) != 4:
+    print("Usage: python run.py <frame_folder> <output_folder> <json>")
     exit(2)
 
-folder = sys.argv[2]
-if os.path.exists(folder):
-    shutil.rmtree(folder)
+frame_folder = sys.argv[1]
+output_folder = sys.argv[2]
+json = sys.argv[3]
 
-os.makedirs(folder)
-
-vidcap = cv2.VideoCapture(sys.argv[1])
-
-if vidcap is None or not vidcap.isOpened():
-    print('Warning: unable to open video source: ', video)
-    exit(2)
-
-count = 0
-
-print("Processing!")
-success, image = vidcap.read()
-while success:
-    cv2.imwrite(os.path.join(folder, f"frame{count}.jpg"), image)
-    count+=1
-    success, image = vidcap.read()
-
-print(f"{count} images have been exported in {folder}.")
-
-exit(0)
+all_frame_rectangle(frame_folder, output_folder, json)
