@@ -228,19 +228,6 @@ __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
 		*px_out = min_value;
 }
 
-
-void generate_histo(matrixImage<float> *mat_in, int *histo)
-{
-	for (size_t w = 0; w < mat_in->width; w++)
-	{
-		for (size_t h = 0; h < mat_in->height; h++)
-		{
-			float *tmp_px = mat_in->at(w, h);
-			int value = (int) (*tmp_px + 0.5);
-			histo[value] += 1;
-		}
-	}
-}
 __global__ void generate_histogram(float *matIn, size_t width, size_t height,
 								   size_t pitch, int *histogram,
 								   size_t hist_size)
