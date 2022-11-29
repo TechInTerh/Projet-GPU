@@ -326,7 +326,7 @@ int find_mean_intensity(int *histo, int nb_px)
 
 void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 {
-	spdlog::info("")
+	spdlog::info("Otsu thresholding");
 	int histo[256] = {0};
 	generate_histo(mat_in, histo);
 	size_t width = mat_in->width;
