@@ -43,7 +43,7 @@ grayscale(uchar3 *matImg, float *matOut, size_t width, size_t height,
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 
-	if (idx > width || idy > height)
+	if (idx >= width || idy >= height)
 	{
 		return;
 	}
@@ -62,7 +62,7 @@ gaussianBlur(float *matIn, float *matOut, size_t width, size_t height,
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
 	size_t offset = kernel_size / 2;
-	if (idx > width || idy > height)
+	if (idx >= width || idy >= height)
 	{
 		return;
 	}
@@ -121,7 +121,7 @@ abs_diff(float *matIn, float *matOut, size_t width, size_t height,
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
-	if (idx > width || idy > height)
+	if (idx >= width || idy >= height)
 	{
 		return;
 	}
@@ -196,7 +196,7 @@ __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
-	if (idx > width || idy > height)
+	if (idx >= width || idy >= height)
 	{
 		return;
 	}
@@ -247,7 +247,7 @@ __global__ void generate_histogram(float *matIn, size_t width, size_t height,
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
-	if (idx > width || idy > height)
+	if (idx >= width || idy >= height)
 	{
 		return;
 	}
@@ -292,7 +292,7 @@ __global__ void thresholding(float *matIn, size_t width, size_t height,
 {
 	size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t idy = blockIdx.y * blockDim.y + threadIdx.y;
-	if (idx > width || idy > height)
+	if (idx >= width || idy >= height)
 	{
 		return;
 	}
