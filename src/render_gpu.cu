@@ -229,6 +229,18 @@ __global__ void dilatationErosion(float *matIn, float *matOut, size_t width,
 }
 
 
+void generate_histo(matrixImage<float> *mat_in, int *histo)
+{
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_in->height; h++)
+		{
+			float *tmp_px = mat_in->at(w, h);
+			int value = (int) (*tmp_px + 0.5);
+			histo[value] += 1;
+		}
+	}
+}
 __global__ void generate_histogram(float *matIn, size_t width, size_t height,
 								   size_t pitch, int *histogram,
 								   size_t hist_size)
@@ -240,11 +252,8 @@ __global__ void generate_histogram(float *matIn, size_t width, size_t height,
 		return;
 	}
 	float *px_in = eltPtr<float>(matIn, idx, idy, pitch);
-	int value = (int)(*px_in + 0.5);
-	if (value < hist_size)
-	{
-		atomicAdd(&histogram[value], 1);
-	}
+	int value = (int)floor(*px_in);
+	atomicAdd(&histogram[value], 1);
 }
 
 int find_mean_intensity(int *histo, size_t nb_px)
@@ -298,7 +307,7 @@ void launchThreshold(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 {
 	spdlog::info("Lunching threshold");
 	size_t size_histo = 256;
-	int *histo = (int *) calloc(size_histo ,sizeof (int));
+	int histo[256] = {0};
 	int *gpu_histo = (int *) cudaMallocX(size_histo * sizeof(int));
 	cudaMemcpyX(gpu_histo, histo, size_histo * sizeof(int), cudaMemcpyHostToDevice);
 
@@ -308,12 +317,19 @@ void launchThreshold(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 	cudaDeviceSynchronizeX();
 	cudaMemcpyX(histo, gpu_histo, size_histo * sizeof(int),
 			   cudaMemcpyDeviceToHost);
+
+	int sum = 0;
+	for (int i = 0; i < 256; i++)
+	{
+		sum += histo[i];
+	}
+	spdlog::info("Sum : {}", sum);
 	int mean = find_mean_intensity(histo, matIn->width * matIn->height);
+
 	spdlog::info("Mean intensity is {}", mean);
 	thresholding<<<blocks,threads>>>(matIn->buffer, matIn->width, matIn->height,
 									 matIn->pitch, mean);
 	cudaDeviceSynchronizeX();
-	free(histo);
 	cudaFreeX(gpu_histo);
 }
 

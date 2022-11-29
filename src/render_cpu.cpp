@@ -343,6 +343,7 @@ void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 	size_t height = mat_in->height;
 	int mean_intensity = find_mean_intensity(histo,
 											 mat_in->width * mat_in->height);
+	spdlog::info("mean_intensity = {}", mean_intensity);
 	for (size_t w = 0; w < width; w++)
 	{
 		for (size_t h = 0; h < height; h++)
