@@ -88,6 +88,7 @@ def all_frame_debug_rectangle(frames_folder, rectangle_folder):
     frames.sort(key=len)
 
     for frame in frames:
+        # TODO exec code cpp to get the json value
         frame_rectangle(frame, (50, 50), (200, 200), rectangle_folder)
     return
 
@@ -126,7 +127,7 @@ def all_frame_rectangle(frames_folder, output_folder, json_path):
     for frame in frames:
         frame_img = frame.split('/')[-1]
         image = cv2.imread(frame)
-        if False or frame_img in data:
+        if frame_img in data:
             for objects in data[frame_img]:
                 x = (objects[0], objects[2])
                 y = (objects[1], objects[3])
