@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <math.h>
 #include <boost/gil/typedefs.hpp>
+#include <cmath>
+#include <string>
 
 	void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
@@ -21,7 +23,6 @@ void toGrayscale(matrixImage<uchar3> *buf_in, matrixImage<float> *buf_out)
 	spdlog::info("To Grayscale");
 	size_t width = buf_in->width;
 	size_t height = buf_in->height;
-	// FIXME add assert in case buf_in size != buf_out size
 	for (size_t w = 0; w < width; w++)
 	{
 		for (size_t h = 0; h < height; h++)
@@ -59,11 +60,6 @@ float **generate_kernel(float **kernel, size_t ker_size)
 	return kernel;
 }
 
-//  FIXME
-//  1. check if operators * and / are defined for uchar4 type and
-//	int/float/size_t
-//  2. check if types don't cause overflows/undefined/unexpected behaviors
-
 void pxGaussianBlur(
 		matrixImage<float> *buf_in,
 		matrixImage<float> *buf_out,
@@ -86,17 +82,6 @@ void pxGaussianBlur(
 	buf_out->set(x, y, px);
 }
 
-//  FIXME
-//  1. make sure buffer_out is correctly initialized (should be empty)
-//  2. ideally find a way to not use 2 buffers
-//  3. perhaps optimize looping for compleity reduction on mat_mult
-//  4. check if typing of kernel should be changed (to char, float, size_t...)
-//  5. Since buffer_in is a grayscale image, maybe the px type shouldn't be uchar4
-//  6. init basic kernels (3x3 & 5x5) in .hpp
-//  7. find a way not to use kernel_size in arguments
-//  8. maybe add padding to image so kernel passes on all px of input image
-
-
 void gaussianBlur(
 		matrixImage<float> *buf_in,
 		matrixImage<float> *buf_out)
@@ -104,10 +89,7 @@ void gaussianBlur(
 	spdlog::info("Gaussian Blurring.");
 	size_t width = buf_in->width;
 	size_t height = buf_in->height;
-	//FIXME add assert to check buf_in size == buf_out size
-	const size_t kernel_size = 7; //FIXME change kernel and kernel size to a
-				      //struct an define a kernel generator
-				      //function of its size
+	const size_t kernel_size = 7;
 	const size_t offset = kernel_size / 2;
 	float **kernel = new float *[kernel_size];
 	for (size_t i = 0; i < kernel_size; i++)
@@ -132,13 +114,9 @@ float pxDilationErosion(matrixImage<float> *matImg,
 		const size_t se_h,
 		const bool d_or_e)
 {
-	//FIXME maybe change the way the structuring element is used. Use square
-	// centered around current pixel instead of the current pixel being in a corner.
 
 	/*
 	 * d_or_e == true => dilation, else erosion.
-	 * there definetly exists a smart way to use only max or min depending
-	 * on d_or_e instead of always computing both...
 	 */
 	float max_value = 0.f;
 	float min_value = 256.f;
@@ -184,8 +162,6 @@ void dilationErosion(matrixImage<float> *mat_in,
 	}
 }
 
-//FIXME atm, only rectangle structuring elements with unique pixel center
-//	used. check if disks would be better.
 void morphOpening(matrixImage<float> *mat_in, matrixImage<float> *mat_out,
 		size_t se_w, size_t se_h)
 {
@@ -254,8 +230,7 @@ void pxBernsenThreshold(matrixImage<float> *mat_in,
 	float *cur_px = mat_in->at(w, h);
 	if (local_contrast < contrast_threshold)
 	{
-		if (local_midgray >= avg_intensity) //FIXME maybe get global mean of the
-						    //image instead of 128.f
+		if (local_midgray >= avg_intensity)
 			value = 255.f;
 	}
 	else if (*cur_px >= local_midgray)
@@ -280,7 +255,7 @@ void bernsenThreshold(matrixImage<float> *mat_in,
 	}
 }
 
-void generate_histo(matrixImage<float> *mat_in, int *histo)
+void generate_hist(matrixImage<float> *mat_in, int *histo)
 {
 	for (size_t w = 0; w < mat_in->width; w++)
 	{
@@ -328,7 +303,7 @@ void otsuThreshold(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 {
 	spdlog::info("Otsu thresholding");
 	int histo[256] = {0};
-	generate_histo(mat_in, histo);
+	generate_hist(mat_in, histo);
 	size_t width = mat_in->width;
 	size_t height = mat_in->height;
 	int mean_intensity = find_mean_intensity(histo, mat_in->width * mat_in->height);
@@ -350,7 +325,7 @@ void update_neighbor(matrixImage<float> *mat_in, matrixImage<float> *mat_out, si
 	float *label = mat_out->at(w, h);
 	if (*value != 0.f && *label == 0.f)
 	{
-		*label = 255.f / cur_label;
+		*label = cur_label;
 		q.push(h * mat_in->width + w);
 	}
 }
@@ -367,7 +342,7 @@ void update_neighbors(matrixImage<float> *mat_in, matrixImage<float> *mat_out, s
 		update_neighbor(mat_in, mat_out, w, h + 1, q, cur_label);
 }
 
-void get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
+int get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 {
 	spdlog::info("labeling connected components");
 	float cur_label = 1.f;
@@ -378,7 +353,7 @@ void get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 		{
 			if (*(mat_in->at(w, h)) == 0.f || *(mat_out->at(w, h)) != 0.f)
 				continue;
-			mat_out->set(w, h, 255.f / cur_label);
+			mat_out->set(w, h, cur_label);
 			q.push(h * mat_in->width + w);
 			while (!q.empty())
 			{
@@ -392,10 +367,41 @@ void get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 		}
 	}
 	std::cout << "number of labels is " << cur_label - 1 << std::endl;
+	return cur_label - 1;
 }
 
-//FIXME maybe try to change all operations so we just need an in matrix.
-void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
+void get_bounding_boxes(matrixImage<float> *mat_in, int nb_labels, std::vector<std::vector<size_t>> &boundingboxes)
+{
+	spdlog::info("getting bounding boxes");
+	for (size_t w = 0; w < mat_in->width; w++)
+	{
+		for (size_t h = 0; h < mat_in->height; h++)
+		{
+			float label = *(mat_in->at(w, h));
+			if (label == 0.f)
+				continue;
+			label -= 1;
+			int bbox_idx = (int)label;
+			std::vector<size_t> bbox = boundingboxes[bbox_idx];
+			if (bbox[0] > w)
+				boundingboxes[bbox_idx][0] = w; //upper left x
+			if (bbox[2] < w)
+				boundingboxes[bbox_idx][2] = w; //lower right x
+			if (bbox[1] > h)
+				boundingboxes[bbox_idx][1] = h; //upper left y
+			if (bbox[3] < h)
+				boundingboxes[bbox_idx][3] = h; //lower right y
+		}
+	}
+	for (int i = 0; i < nb_labels; i++)
+	{
+
+		boundingboxes[i][2] -= boundingboxes[i][0];
+		boundingboxes[i][3] -= boundingboxes[i][1];
+	}
+}
+
+void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, char *filename, json &bboxes)
 {
 	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
 	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,
@@ -458,9 +464,29 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2)
 
 	matrixImage<float> *matLabels = new matrixImage<float>(matImg1->width,matImg1->height);
 	matLabels->fill(0.f);
-	get_labels(matThreshold, matLabels);
+	int nb_labels = get_labels(matThreshold, matLabels);
 	matrixImage<uchar3> *matLabels_out = matFloatToMatUchar3(matLabels);
 	write_image(matLabels_out, "labels.png");
+
+	std::vector<std::vector<size_t>> boundingboxes;
+	for (int i = 0; i < nb_labels; i++)
+	{
+		std::vector<size_t> bbox;
+		bbox.push_back(matImg1->width);
+		bbox.push_back(matImg1->height);
+		bbox.push_back(0);
+		bbox.push_back(0);
+		boundingboxes.push_back(bbox);
+	}
+	get_bounding_boxes(matLabels, nb_labels, boundingboxes);
+	for (int i = 0; i < nb_labels; i++)
+	{
+		std::cout << "[" << boundingboxes[i][0] << ", " << boundingboxes[i][1] << ", " << boundingboxes[i][2] << ", " << boundingboxes[i][3] << "]"<< std::endl;
+	}
+
+	std::string f(filename);
+	auto base_filename = f.substr(f.find_last_of("/") + 1);
+	bboxes[base_filename] = {boundingboxes};
 
 	delete matImg1;
 	delete matImg2;
