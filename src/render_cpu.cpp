@@ -383,7 +383,6 @@ int get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 			cur_label++;
 		}
 	}
-	std::cout << "number of labels is " << cur_label - 1 << std::endl;
 	return cur_label - 1;
 }
 
@@ -454,16 +453,12 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, const char *fi
 
 	matrixImage<float> *matLabels = new matrixImage<float>(matImg1->width,matImg1->height);
 	matLabels->fill(0.f);
-	int nb_labels = get_labels(matThreshold, matLabels);
+	get_labels(matThreshold, matLabels);
 	matrixImage<uchar3> *matLabels_out = matFloatToMatUchar3(matLabels);
 	write_image(matLabels_out, "labels.png");
 
 	std::vector<std::vector<size_t>> boundingboxes;
 	get_bounding_boxes(matLabels, boundingboxes);
-	for (int i = 0; i < nb_labels; i++)
-	{
-		std::cout << "[" << boundingboxes[i][0] << ", " << boundingboxes[i][1] << ", " << boundingboxes[i][2] << ", " << boundingboxes[i][3] << "]"<< std::endl;
-	}
 
 	std::string f(filename);
 	auto base_filename = f.substr(f.find_last_of("/") + 1);

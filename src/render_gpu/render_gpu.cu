@@ -33,7 +33,7 @@ absDiff(float *matIn, float *matOut, size_t width, size_t height,
 void lunch_abs_diff(matrixImage<float> *matBlur1, matrixImage<float> *matBlur2,
 					dim3 threads, dim3 blocks)
 {
-	spdlog::info("Lunching abs diff");
+	spdlog::info("Launching abs diff");
 	absDiff<<<blocks, threads>>>(matBlur1->buffer, matBlur2->buffer,
 								 matBlur2->width, matBlur2->height,
 								 matBlur2->pitch);
@@ -144,7 +144,7 @@ __global__ void thresholding(float *matIn, size_t width, size_t height,
 
 void launchThreshold(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 {
-	spdlog::info("Lunching threshold");
+	spdlog::info("Launching threshold");
 	size_t size_histo = 256;
 	int histo[256] = {0};
 	int *gpu_histo = (int *) cudaMallocX(size_histo * sizeof(int));
@@ -231,7 +231,7 @@ void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
 	size_t size2_w = 0.05 * matIn->width;
 	size_t size2_h = 0.05 * matIn->height;
 
-	spdlog::info("Lunching morph closing");
+	spdlog::info("Launching morph closing");
 	matrixImage<float> *matOut = matIn->deepCopy();
 	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
 										   matIn->width, matIn->height,
@@ -245,7 +245,7 @@ void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
 										   size1_h,
 										   false);
 	cudaDeviceSynchronizeX();
-	spdlog::info("Lunching morph opening");
+	spdlog::info("Launching morph opening");
 	dilatationErosion<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
 										   matIn->width, matIn->height,
 										   matIn->pitch, matOut->pitch, size2_w,
@@ -265,7 +265,7 @@ void launchMorphOpeningClosing(matrixImage<float> *matIn, dim3 threads,
 matrixImage<float> *
 launchLabelisation(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 {
-	spdlog::info("Lunching labelisation");
+	spdlog::info("Launching labelisation");
 	matrixImage<float> *matOutIndex = matIn->deepCopy();
 	int one = 1;
 	int *index = (int *)cudaMallocX(sizeof(int));
@@ -337,10 +337,6 @@ void useGpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2,
 
 	std::vector<std::vector<size_t>> boundingboxes;
 	get_bounding_boxes(matLabel, boundingboxes);
-	for (int i = 0; i < boundingboxes.size(); i++)
-	{
-		std::cout << "[" << boundingboxes[i][0] << ", " << boundingboxes[i][1] << ", " << boundingboxes[i][2] << ", " << boundingboxes[i][3] << "]"<< std::endl;
-	}
 
 	std::string f(filename);
 	auto base_filename = f.substr(f.find_last_of("/") + 1);
