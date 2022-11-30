@@ -486,7 +486,7 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, char *filename
 
 	std::string f(filename);
 	auto base_filename = f.substr(f.find_last_of("/") + 1);
-	bboxes[base_filename] = {boundingboxes};
+	bboxes[base_filename] = boundingboxes;
 
 	delete matImg1;
 	delete matImg2;
