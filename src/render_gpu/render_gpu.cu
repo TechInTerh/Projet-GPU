@@ -337,7 +337,7 @@ void useGpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2,
 
 	std::vector<std::vector<size_t>> boundingboxes;
 	get_bounding_boxes(matLabel, boundingboxes);
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < boundingboxes.size(); i++)
 	{
 		std::cout << "[" << boundingboxes[i][0] << ", " << boundingboxes[i][1] << ", " << boundingboxes[i][2] << ", " << boundingboxes[i][3] << "]"<< std::endl;
 	}
