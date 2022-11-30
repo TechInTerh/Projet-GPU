@@ -4,7 +4,6 @@
 #include <spdlog/spdlog.h>
 #include <fstream>
 
-#define USE_GPU false
 namespace gil = boost::gil;
 
 
@@ -19,44 +18,48 @@ gil::rgb8_image_t loadImage(const std::string &path)
 
 int main(int argc, const char *argv[])
 {
+	bool isUseGpu = false;
 	if (argc < 3)
 	{
 
-		spdlog::error("ArgumentError: ./main [--use-gpu] <file1> <file2>");
+		spdlog::error("ArgumentError: ./main [--gpu] <file1> <file2> [file3...]");
 		std::exit(1);
 	}
-	if (argc < 4)
+	std::string first_image;
+	int i;
+	if (argv[1] == std::string("--gpu"))
 	{
-		gil::rgb8_image_t image1 = loadImage(argv[1]);
-		gil::rgb8_image_t image2 = loadImage(argv[2]);
-		spdlog::info("Using CPU");
-		useCpu(image1, image2);
+		first_image = argv[2];
+		isUseGpu = true;
+		i = 3;
 	}
 	else
 	{
-		gil::rgb8_image_t image1 = loadImage(argv[2]);
-		gil::rgb8_image_t image2 = loadImage(argv[3]);
-		spdlog::info("Using GPU");
-		useGpu(image1, image2);
-		cudaDeviceReset();
+		first_image = argv[1];
+		i = 2;
 	}
-
-	//FIXME add option handling here
-	gil::rgb8_image_t image1 = loadImage(argv[1]);
+	gil::rgb8_image_t image1 = loadImage(first_image);
 	json bboxes;
-	for (int i = 2; i < argc; i++)
+	for (; i < argc; i++)
 	{
 
 		gil::rgb8_image_t image2 = loadImage(argv[i]);
-#if (USE_GPU)
-		spdlog::info("Using GPU");
-		use_gpu(image1, image2);
-#else
-		spdlog::info("Using CPU");
-		useCpu(image1, image2, argv[i], bboxes);
-#endif
+		if (isUseGpu)
+		{
+			spdlog::info("Using GPU");
+			useGpu(image1, image2,argv[i], bboxes);
+		}
+		else
+		{
+			spdlog::info("Using CPU");
+			useCpu(image1, image2,argv[i],bboxes);
+		}
 	}
-	std::ofstream of("bounding_boxes");
+	std::ofstream of("bounding_boxes.json");
 	of << bboxes;
+	if (isUseGpu)
+	{
+		cudaDeviceReset();
+	}
 	return 0;
 }

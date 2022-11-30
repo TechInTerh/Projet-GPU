@@ -45,6 +45,7 @@ target_sources(renderer_gpu PRIVATE
         src/render_gpu/gray_blur.cu
         src/render_gpu/tools.cu
         src/env.cu
+        src/bounding_box.cu
         )
 set_target_properties(renderer_gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
@@ -57,6 +58,7 @@ target_sources(renderer_cpu PRIVATE
         src/render_cpu.cpp src/render_cpu.hpp
         src/matrix_image/matrix_image.cu
         src/env.cu
+        src/bounding_box.cu
         )
 
 add_executable(main src/main.cpp)

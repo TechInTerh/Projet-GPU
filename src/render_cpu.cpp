@@ -9,6 +9,7 @@
 #include <boost/gil/typedefs.hpp>
 #include <cmath>
 #include <string>
+#include "bounding_box.cuh"
 
 void
 _abortError(const char *msg, const char *filename, const char *fname, int line)
@@ -386,61 +387,7 @@ int get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 	return cur_label - 1;
 }
 
-void new_bounding_box(std::vector<std::vector<size_t>> &boundingboxes, size_t w, size_t h)
-{
-	std::vector<size_t> bbox;
-	bbox.push_back(w);
-	bbox.push_back(h);
-	bbox.push_back(w);
-	bbox.push_back(h);
-	boundingboxes.push_back(bbox);
-}
-
-bool map_contains(std::map<float, int> map, float key)
-{
-	auto search = map.find(key);
-	return search != map.end();
-}
-
-void get_bounding_boxes(matrixImage<float> *mat_in, std::vector<std::vector<size_t>> &boundingboxes)
-{
-	spdlog::info("getting bounding boxes");
-	std::map<float, int> met_labels;
-	int nb_labels = 0;
-	for (size_t w = 0; w < mat_in->width; w++)
-	{
-		for (size_t h = 0; h < mat_in->height; h++)
-		{
-			float label = *(mat_in->at(w, h));
-			if (label == 0.f)
-				continue;
-			if (!map_contains(met_labels, label))
-			{
-				new_bounding_box(boundingboxes, w, h);
-				met_labels[label] = nb_labels;
-				nb_labels++;
-			}
-			int bbox_idx = met_labels[label];
-			std::vector<size_t> bbox = boundingboxes[bbox_idx];
-			if (bbox[0] > w)
-				boundingboxes[bbox_idx][0] = w; //upper left x
-			if (bbox[2] < w)
-				boundingboxes[bbox_idx][2] = w; //lower right x
-			if (bbox[1] > h)
-				boundingboxes[bbox_idx][1] = h; //upper left y
-			if (bbox[3] < h)
-				boundingboxes[bbox_idx][3] = h; //lower right y
-		}
-	}
-	for (int i = 0; i < nb_labels; i++)
-	{
-
-		boundingboxes[i][2] -= boundingboxes[i][0];
-		boundingboxes[i][3] -= boundingboxes[i][1];
-	}
-}
-
-void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, char *filename, json &bboxes)
+void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, const char *filename, json &bboxes)
 {
 	matrixImage<uchar3> *matImg1 = toMatrixImage(image1);
 	matrixImage<float> *matGray1 = new matrixImage<float>(matImg1->width,
@@ -479,13 +426,13 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, char *filename
 
 	matrixImage<float> *matClosing = new matrixImage<float>(matImg1->width,
 															matImg1->height);
-	morphClosing(matGBlur1, matClosing, 20, 20);
+	morphClosing(matGBlur1, matClosing, matImg1->width*0.02, matImg1->height*0.02);
 	matrixImage<uchar3> *matClosing_out = matFloatToMatUchar3(matClosing);
 	write_image(matClosing_out, "closing.png");
 
 	matrixImage<float> *matOpening = new matrixImage<float>(matImg1->width,
 															matImg1->height);
-	morphOpening(matClosing, matOpening, 20, 20);
+	morphOpening(matClosing, matOpening, matImg1->width*0.05, matImg1->height*0.05);
 	matrixImage<uchar3> *matOpening_out = matFloatToMatUchar3(matOpening);
 	write_image(matOpening_out, "opening.png");
 

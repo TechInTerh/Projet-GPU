@@ -3,7 +3,9 @@
 #include "tools.cuh"
 #include "gray_blur.cuh"
 #include <iostream>
+#include <map>
 #include "cuda_runtime_api.h"
+#include "bounding_box.cuh"
 
 
 __global__ void
@@ -315,7 +317,8 @@ multiplyValue(float *matIn, size_t width, size_t height, size_t pitch_in,
 }
 
 
-void useGpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
+void useGpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2,
+			const char *filename,json &bboxes)
 {
 	dim3 threads(32, 32);
 	dim3 blocks((image.width() + threads.x - 1) / threads.x,
@@ -329,15 +332,22 @@ void useGpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 
 	launchThreshold(matBlur2, threads, blocks);
 
-	matrixImage<float> *ret = launchLabelisation(matBlur2, threads, blocks);
-	spdlog::info("Multiplying");
-	multiplyValue<<<blocks, threads>>>(ret->buffer, ret->width, ret->height,
-									   ret->pitch, 50);
-	cudaDeviceSynchronizeX();
-	writeImageFloat(ret, "gpu_labelisation.png");
+	matrixImage<float> *matLabel = launchLabelisation(matBlur2, threads, blocks);
+	matLabel->toCpu();
+
+	std::vector<std::vector<size_t>> boundingboxes;
+	get_bounding_boxes(matLabel, boundingboxes);
+	for (int i = 0; i < 2; i++)
+	{
+		std::cout << "[" << boundingboxes[i][0] << ", " << boundingboxes[i][1] << ", " << boundingboxes[i][2] << ", " << boundingboxes[i][3] << "]"<< std::endl;
+	}
+
+	std::string f(filename);
+	auto base_filename = f.substr(f.find_last_of("/") + 1);
+	bboxes[base_filename] = boundingboxes;
 
 	delete matBlur1;
 	delete matBlur2;
-	delete ret;
+	delete matLabel;
 
 }

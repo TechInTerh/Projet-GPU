@@ -14,7 +14,7 @@
 
 #define ERROR_MARGIN 0.1f
 
-void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, char *filename, json &bboxes);
+void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, const char *filename, json &bboxes);
 
 
 void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out);
