@@ -264,51 +264,38 @@ matrixImage<float> *
 launchLabelisation(matrixImage<float> *matIn, dim3 threads, dim3 blocks)
 {
 	spdlog::info("Lunching labelisation");
-	matrixImage<float> *matOut = matIn->deepCopy();
+	matrixImage<float> *matOutIndex = matIn->deepCopy();
 	int one = 1;
 	int *index = (int *)cudaMallocX(sizeof(int));
 	cudaMemcpyX(index, &one, sizeof(int), cudaMemcpyHostToDevice);
-	setOnIndex<<<blocks, threads>>>(matIn->buffer, matOut->buffer,
+	setOnIndex<<<blocks, threads>>>(matIn->buffer, matOutIndex->buffer,
 									matIn->width, matIn->height,
-									matIn->pitch, matOut->pitch, index);
+									matIn->pitch, matOutIndex->pitch, index);
 	cudaDeviceSynchronizeX();
 	int *isChanged_gpu = (int *) cudaMallocX(sizeof(int));
 	int isChanges = 1;
-	matrixImage<float> *matOut2 = matOut->deepCopy();
-	matrixImage<float> *ret = matOut;
+	matrixImage<float> *matOutLabel = matOutIndex->deepCopy();
+	matrixImage<float> *ret = matOutLabel;
 	while (isChanges >= 1)
 	{
 		isChanges = 0;
 		cudaMemcpyX(isChanged_gpu, &isChanges, sizeof(int),
 					cudaMemcpyHostToDevice);
 
-		labelNeighbors<<<blocks, threads>>>(matOut->buffer, matOut2->buffer,
-											matOut2->width, matOut2->height,
-											matOut->pitch, matOut2->pitch,
+		labelNeighbors<<<blocks, threads>>>(matOutIndex->buffer, matOutLabel->buffer,
+											matOutLabel->width, matOutLabel->height,
+											matOutIndex->pitch, matOutLabel->pitch,
 											isChanged_gpu);
 		cudaDeviceSynchronizeX();
 		cudaMemcpyX(&isChanges, isChanged_gpu, sizeof(int),
 					cudaMemcpyDeviceToHost);
-		ret = matOut2;
-		if (isChanges)
-		{
-			isChanges = 0;
-			cudaMemcpyX(isChanged_gpu, &isChanges, sizeof(int),
-						cudaMemcpyHostToDevice);
-			labelNeighbors<<<blocks, threads>>>(matOut2->buffer,
-												matOut->buffer,
-												matOut2->width,
-												matOut2->height,
-												matOut2->pitch, matOut->pitch,
-												isChanged_gpu);
-			cudaDeviceSynchronizeX();
-			cudaMemcpyX(&isChanges, isChanged_gpu, sizeof(int),
-						cudaMemcpyDeviceToHost);
-			ret = matOut;
-		}
+		ret = matOutLabel;
+		matOutLabel = matOutIndex;
+		matOutIndex = ret;
 	}
 
 	cudaFreeX(isChanged_gpu);
+	delete matOutLabel;
 	return ret;
 }
 
@@ -343,6 +330,7 @@ void useGpu(gil::rgb8_image_t &image, gil::rgb8_image_t &image2)
 	launchThreshold(matBlur2, threads, blocks);
 
 	matrixImage<float> *ret = launchLabelisation(matBlur2, threads, blocks);
+	spdlog::info("Multiplying");
 	multiplyValue<<<blocks, threads>>>(ret->buffer, ret->width, ret->height,
 									   ret->pitch, 50);
 	cudaDeviceSynchronizeX();
