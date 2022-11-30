@@ -8,12 +8,13 @@
 #include <boost/gil/extension/io/png.hpp>
 #include <vector_types.h>
 #include <spdlog/spdlog.h>
+#include <wrapper_json.hpp>
 #include "matrix_image/matrix_image.cuh"
 
 
 #define ERROR_MARGIN 0.1f
 
-void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2);
+void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, char *filename, json &bboxes);
 
 
 void toGrayscale(matrixImage<uchar4> *buf_in, matrixImage<float> *buf_out);

@@ -2,7 +2,9 @@
 #include "render_gpu.cuh"
 #include "render_cpu.hpp"
 #include <spdlog/spdlog.h>
-#define USE_GPU true
+#include <fstream>
+
+#define USE_GPU false
 namespace gil = boost::gil;
 
 
@@ -15,7 +17,7 @@ gil::rgb8_image_t loadImage(const std::string &path)
 
 }
 
-int main(int argc, const char *argv[])
+int main(int argc, char *argv[])
 {
 	if (argc < 3)
 	{
@@ -26,13 +28,20 @@ int main(int argc, const char *argv[])
 
 	//FIXME add option handling here
 	gil::rgb8_image_t image1 = loadImage(argv[1]);
-	gil::rgb8_image_t image2 = loadImage(argv[2]);
+	json bboxes;
+	for (int i = 2; i < argc; i++)
+	{
+
+		gil::rgb8_image_t image2 = loadImage(argv[i]);
 #if (USE_GPU)
-	spdlog::info("Using GPU");
-	use_gpu(image1, image2);
+		spdlog::info("Using GPU");
+		use_gpu(image1, image2);
 #else
-	spdlog::info("Using CPU");
-	useCpu(image1, image2);
+		spdlog::info("Using CPU");
+		useCpu(image1, image2, argv[i], bboxes);
 #endif
+	}
+	std::ofstream of("bounding_boxes");
+	of << bboxes;
 	return 0;
 }

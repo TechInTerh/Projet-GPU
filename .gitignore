@@ -1,4 +1,8 @@
 *.i
+output/
+rectangle/
+frames/
+*/__pycache__
 *.ii
 *.gpu
 *.ptx
