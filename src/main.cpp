@@ -1,5 +1,5 @@
 #include <iostream>
-#include "render_gpu.cuh"
+#include "render_gpu/render_gpu.cuh"
 #include "render_cpu.hpp"
 #include <spdlog/spdlog.h>
 #define USE_GPU true
@@ -29,7 +29,7 @@ int main(int argc, const char *argv[])
 	gil::rgb8_image_t image2 = loadImage(argv[2]);
 #if (USE_GPU)
 	spdlog::info("Using GPU");
-	use_gpu(image1, image2);
+	useGpu(image1, image2);
 #else
 	spdlog::info("Using CPU");
 	useCpu(image1, image2);

@@ -34,14 +34,16 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -W -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 
-add_library(renderer_gpu src/matrix_image/matrix_image.cu src/matrix_image/matrix_image.cuh)
+add_library(renderer_gpu)
 target_compile_features(renderer_gpu PUBLIC cxx_std_17)
 target_link_libraries(renderer_gpu PRIVATE spdlog::spdlog)
 target_link_libraries(renderer_gpu PRIVATE ${Boost_LIBRARIES})
 target_sources(renderer_gpu PRIVATE
-        src/render_gpu.cu src/render_gpu.cuh
+        src/render_gpu/render_gpu.cu
         src/matrix_image/matrix_image.cu
         src/cudaFunctions/cudaFunctions.cu
+        src/render_gpu/gray_blur.cu
+        src/render_gpu/tools.cu
         src/env.cu
         )
 set_target_properties(renderer_gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
