@@ -1,3 +1,5 @@
+#!/bin/sh
+cd build
 set -e
 make -j4
 ./main "../img/pin.png" "../img/pin_1.png" "../img/pin_2.png"
