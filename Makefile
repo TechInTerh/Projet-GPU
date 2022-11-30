@@ -1,7 +1,7 @@
 all:
 	mkdir -p build
 	cd build; cmake -DCMAKE_BUILD_TYPE=Release ..
-	cd build; make
+	cd build; make -j4
 
 debug:
 	mkdir -p debug

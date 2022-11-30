@@ -370,9 +370,27 @@ int get_labels(matrixImage<float> *mat_in, matrixImage<float> *mat_out)
 	return cur_label - 1;
 }
 
-void get_bounding_boxes(matrixImage<float> *mat_in, int nb_labels, std::vector<std::vector<size_t>> &boundingboxes)
+void new_bounding_box(std::vector<std::vector<size_t>> &boundingboxes, size_t w, size_t h)
+{
+	std::vector<size_t> bbox;
+	bbox.push_back(w);
+	bbox.push_back(h);
+	bbox.push_back(w);
+	bbox.push_back(h);
+	boundingboxes.push_back(bbox);
+}
+
+bool map_contains(std::map<float, int> map, float key)
+{
+	auto search = map.find(key);
+	return search != map.end();
+}
+
+void get_bounding_boxes(matrixImage<float> *mat_in, std::vector<std::vector<size_t>> &boundingboxes)
 {
 	spdlog::info("getting bounding boxes");
+	std::map<float, int> met_labels;
+	int nb_labels = 0;
 	for (size_t w = 0; w < mat_in->width; w++)
 	{
 		for (size_t h = 0; h < mat_in->height; h++)
@@ -380,8 +398,13 @@ void get_bounding_boxes(matrixImage<float> *mat_in, int nb_labels, std::vector<s
 			float label = *(mat_in->at(w, h));
 			if (label == 0.f)
 				continue;
-			label -= 1;
-			int bbox_idx = (int)label;
+			if (!map_contains(met_labels, label))
+			{
+				new_bounding_box(boundingboxes, w, h);
+				met_labels[label] = nb_labels;
+				nb_labels++;
+			}
+			int bbox_idx = met_labels[label];
 			std::vector<size_t> bbox = boundingboxes[bbox_idx];
 			if (bbox[0] > w)
 				boundingboxes[bbox_idx][0] = w; //upper left x
@@ -469,16 +492,7 @@ void useCpu(gil::rgb8_image_t &image1, gil::rgb8_image_t &image2, char *filename
 	write_image(matLabels_out, "labels.png");
 
 	std::vector<std::vector<size_t>> boundingboxes;
-	for (int i = 0; i < nb_labels; i++)
-	{
-		std::vector<size_t> bbox;
-		bbox.push_back(matImg1->width);
-		bbox.push_back(matImg1->height);
-		bbox.push_back(0);
-		bbox.push_back(0);
-		boundingboxes.push_back(bbox);
-	}
-	get_bounding_boxes(matLabels, nb_labels, boundingboxes);
+	get_bounding_boxes(matLabels, boundingboxes);
 	for (int i = 0; i < nb_labels; i++)
 	{
 		std::cout << "[" << boundingboxes[i][0] << ", " << boundingboxes[i][1] << ", " << boundingboxes[i][2] << ", " << boundingboxes[i][3] << "]"<< std::endl;
