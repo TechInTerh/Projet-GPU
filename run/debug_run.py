@@ -18,7 +18,7 @@ rectangle_folder = sys.argv[4]
 
 vid_to_frames(frame_folder, video_path)
 
-all_frame_debug_rectangle(frame_folder, rectangle_folder)
+#all_frame_debug_rectangle(frame_folder, rectangle_folder)
 
 #frames_to_vid(ouput_folder, frame_folder, video_path)
-frames_to_vid(ouput_folder, rectangle_folder, video_path)
+#frames_to_vid(ouput_folder, rectangle_folder, video_path)
