@@ -59,7 +59,8 @@ def vid_to_frames(frames_folder, video):
     print("Processing!")
 
     while success:
-        cv2.imwrite(os.path.join(frames_folder, f"frame{count}.png"), image)
+        if count % 20 == 0:
+            cv2.imwrite(os.path.join(frames_folder, f"frame{count}.png"), image)
         count+=1
         success, image = vidcap.read()
 
