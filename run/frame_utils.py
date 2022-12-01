@@ -132,6 +132,7 @@ def all_frame_rectangle(frames_folder, output_folder, json_path):
                 x = (objects[0], objects[1])
                 y = (objects[0] + objects[2], objects[1] + objects[3])
                 image = cv2.rectangle(image, x, y, (0, 255, 0), 2)
+        cv2.imwrite(frame, image)
         out.write(image)
 
     print(f"All images have been merged in one video {path_output}.")
